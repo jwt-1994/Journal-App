@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./backend
+    container_name: sticker-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///./data/sticker.db
+      - UPLOAD_DIR=/app/data/uploads
+      - CORS_ORIGINS=*
