@@ -116,19 +116,27 @@ jobs:
       - name: Export Unsigned IPA
         if: github.event.inputs.build_type != 'signed'
         run: |
-          cd frontend/ios/App
-          mkdir -p build/export
-          xcodebuild -exportArchive \
-            -archivePath ./build/App.xcarchive \
-            -exportPath ./build/export \
-            -exportOptionsPlist ../../ExportOptions-unsigned.plist
+          echo "Manually packaging unsigned IPA..."
+          cd frontend/ios/App/build
+          mkdir -p Payload
+          APP_PATH=$(find App.xcarchive -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: .app not found in archive"
+            find App.xcarchive -name "*.app" 2>/dev/null || echo "No .app found"
+            ls -la App.xcarchive/Products/Applications/ 2>/dev/null || echo "No Applications dir"
+            exit 1
+          fi
+          echo "Found app at: $APP_PATH"
+          cp -R "$APP_PATH" Payload/
+          zip -r App.ipa Payload
+          echo "IPA created: $(ls -lh App.ipa)"
 
       - name: Upload Unsigned IPA
         if: github.event.inputs.build_type != 'signed'
         uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
-          path: frontend/ios/App/build/export/*.ipa
+          path: frontend/ios/App/build/App.ipa
           retention-days: 7
 
       # ========== 签名构建（TestFlight 分发用） ==========
