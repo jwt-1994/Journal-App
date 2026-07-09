@@ -55,6 +55,11 @@ jobs:
           npx cap add ios
           npx cap sync ios
 
+      - name: Install CocoaPods
+        run: |
+          cd frontend/ios/App
+          pod install --repo-update
+
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
