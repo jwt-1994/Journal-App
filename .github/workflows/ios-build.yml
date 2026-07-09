@@ -57,8 +57,18 @@ jobs:
 
       - name: Install CocoaPods
         run: |
-          cd frontend/ios/App
-          pod install --repo-update
+          cd frontend
+          # Capacitor 8 可能把 Podfile 放在 ios/App 或 ios/ 下
+          if [ -f ios/App/Podfile ]; then
+            cd ios/App && pod install --repo-update
+          elif [ -f ios/Podfile ]; then
+            cd ios && pod install --repo-update
+          else
+            echo "Podfile not found, checking structure..."
+            find ios -name Podfile 2>/dev/null || echo "No Podfile found"
+            ls -la ios/App/ 2>/dev/null || echo "ios/App does not exist"
+            ls -la ios/ 2>/dev/null || echo "ios does not exist"
+          fi
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
