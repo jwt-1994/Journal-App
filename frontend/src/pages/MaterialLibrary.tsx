@@ -110,9 +110,8 @@ export default function MaterialLibrary() {
     setPage(1);
   }, [activeTab, searchText]);
 
-  const handlePreview = (src: string, title: string) => {
+  const handlePreview = (src: string, _title: string) => {
     setPreviewSrc(src);
-    setPreviewTitle(title);
     setPreviewVisible(true);
   };
 

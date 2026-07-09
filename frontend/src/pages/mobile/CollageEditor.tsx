@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button, Toast, Popup, Segmented, Slider, Input, Dialog } from 'antd-mobile';
+import { Button, Toast, Popup, Segmented, Slider, Input, Dialog, TextArea } from 'antd-mobile';
 import {
   SelectOutlined,
   HighlightOutlined,
@@ -228,7 +228,7 @@ export default function MobileCollageEditor() {
   };
 
   // --- 触控事件 ---
-  const handleTouchStart = (e: KonvaEventObject<TouchEvent>) => {
+  const handleTouchStart = (e: any) => {
     const touch = e.evt;
     setContextMenu(null);
 
@@ -287,7 +287,7 @@ export default function MobileCollageEditor() {
     }
   };
 
-  const handleTouchMove = (e: KonvaEventObject<TouchEvent>) => {
+  const handleTouchMove = (e: any) => {
     const touch = e.evt;
     // 取消长按（手指移动了）
     if (longPressTimerRef.current) {
@@ -329,7 +329,7 @@ export default function MobileCollageEditor() {
   };
 
   // --- 画笔（触控）---
-  const handleBrushStart = (e: KonvaEventObject<TouchEvent>) => {
+  const handleBrushStart = (e: any) => {
     setIsDrawing(true);
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
@@ -343,7 +343,7 @@ export default function MobileCollageEditor() {
     setSelectedId(el.id);
   };
 
-  const handleBrushMove = (e: KonvaEventObject<TouchEvent>) => {
+  const handleBrushMove = (e: any) => {
     if (!isDrawing) return;
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
@@ -358,7 +358,7 @@ export default function MobileCollageEditor() {
   const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
   const shapeIdRef = useRef<string | null>(null);
 
-  const handleShapeStart = (e: KonvaEventObject<TouchEvent>) => {
+  const handleShapeStart = (e: any) => {
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
     saveState();
@@ -373,7 +373,7 @@ export default function MobileCollageEditor() {
     setElements(prev => [...prev, el]);
   };
 
-  const handleShapeMove = (e: KonvaEventObject<TouchEvent>) => {
+  const handleShapeMove = (e: any) => {
     if (!shapeStartRef.current || !shapeIdRef.current) return;
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
@@ -413,7 +413,7 @@ export default function MobileCollageEditor() {
   };
 
   // --- 选中/拖拽 ---
-  const handleStageTap = (e: KonvaEventObject<TouchEvent>) => {
+  const handleStageTap = (e: any) => {
     setContextMenu(null);
     if (activeTool === 'select') {
       if (e.target === e.target.getStage()) {
@@ -769,7 +769,7 @@ export default function MobileCollageEditor() {
       {/* 图形类型选择 */}
       {activeTool === 'shape' && showToolbar && (
         <div style={{ position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
-          <Segmented size="small" value={shapeType} onChange={v => setShapeType(v as ShapeType)}
+          <Segmented value={shapeType} onChange={v => setShapeType(v as ShapeType)}
             options={SHAPE_TYPES.map(s => ({ value: s.key, label: s.label }))}
             style={{ background: 'rgba(255,255,255,0.95)', borderRadius: 12, padding: 4 }}
           />
@@ -785,7 +785,7 @@ export default function MobileCollageEditor() {
             style={{ width: 26, height: 26, borderRadius: 13, border: '2px solid #e8e8e8', cursor: 'pointer', padding: 0, background: 'none' }} />
           {activeTool === 'brush' && (
             <Slider value={brushSize} min={2} max={16} step={2} onChange={v => setBrushSize(v as number)}
-              style={{ width: 80, '--adm-color-primary': '#1677ff' }} />
+              style={{ width: 80, '--adm-color-primary': '#1677ff' } as React.CSSProperties} />
           )}
         </div>
       )}
@@ -886,7 +886,7 @@ export default function MobileCollageEditor() {
               )}
               {selectedElement.type === 'text' && (
                 <div style={{ marginBottom: 8 }}>
-                  <Input.TextArea value={selectedElement.text} onChange={val => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, text: val } : el))} rows={3} />
+                  <TextArea value={selectedElement.text} onChange={(val: string) => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, text: val } : el))} rows={3} />
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ color: '#999' }}>颜色：</span>
                     <input type="color" value={selectedElement.textFill} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, textFill: e.target.value } : el))}
@@ -986,7 +986,7 @@ export default function MobileCollageEditor() {
       <Dialog
         visible={showTextInput}
         title="输入文字"
-        content={<Input.TextArea value={textInput} onChange={setTextInput} rows={3} placeholder="输入文字内容..." />}
+        content={<TextArea value={textInput} onChange={(val: string) => setTextInput(val)} rows={3} placeholder="输入文字内容..." />}
         onClose={() => setShowTextInput(false)}
         actions={[
           { key: 'cancel', text: '取消', onClick: () => setShowTextInput(false) },

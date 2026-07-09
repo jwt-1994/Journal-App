@@ -45,8 +45,8 @@ export default function MobileMaterialLibrary() {
 
   const [activeTab, setActiveTab] = useState('all');
   const [searchText, setSearchText] = useState('');
-  const [sortBy, setSortBy] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const sortBy = 'created_at';
+  const sortOrder = 'desc';
 
   // 图片预览
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -104,7 +104,7 @@ export default function MobileMaterialLibrary() {
     await fetchMaterials(nextPage, false);
   };
 
-  const handleImageClick = (src: string, allImages: string[], index: number) => {
+  const handleImageClick = (_src: string, allImages: string[], index: number) => {
     setPreviewImages(allImages);
     setPreviewIndex(index);
     setPreviewVisible(true);
