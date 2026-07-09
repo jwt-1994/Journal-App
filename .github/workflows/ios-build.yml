@@ -31,9 +31,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Capacitor CLI
+        run: |
+          npm install -g @capacitor/cli
 
       - name: Install Dependencies
         run: |
@@ -45,16 +49,9 @@ jobs:
           cd frontend
           npm run build
 
-      - name: Install Capacitor Plugins
-        run: |
-          cd frontend
-          npm install @capacitor/ios @capacitor/core @capacitor/cli
-          npm install @capacitor/camera @capacitor/filesystem @capacitor/share @capacitor/haptics @capacitor/status-bar
-
       - name: Setup Capacitor iOS
         run: |
           cd frontend
-          npx cap init "手账素材库" "com.sticker.material" --web-dir=dist
           npx cap add ios
           npx cap sync ios
 

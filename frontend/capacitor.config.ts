@@ -6,9 +6,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   bundledWebRuntime: false,
   plugins: {
-    SplashScreen: {
-      launchShowDuration: 2000,
-    },
     StatusBar: {
       style: 'dark',
       backgroundColor: '#ffffff',
