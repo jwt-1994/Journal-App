@@ -58,16 +58,18 @@ jobs:
       - name: Install CocoaPods
         run: |
           cd frontend
-          # Capacitor 8 可能把 Podfile 放在 ios/App 或 ios/ 下
           if [ -f ios/App/Podfile ]; then
             cd ios/App && pod install --repo-update
+            echo "=== After pod install ==="
+            ls -la
           elif [ -f ios/Podfile ]; then
             cd ios && pod install --repo-update
+            echo "=== After pod install ==="
+            ls -la
           else
             echo "Podfile not found, checking structure..."
             find ios -name Podfile 2>/dev/null || echo "No Podfile found"
-            ls -la ios/App/ 2>/dev/null || echo "ios/App does not exist"
-            ls -la ios/ 2>/dev/null || echo "ios does not exist"
+            ls -laR ios/ 2>/dev/null || echo "ios does not exist"
           fi
 
       - name: Setup Xcode
@@ -80,14 +82,28 @@ jobs:
         if: github.event.inputs.build_type != 'signed'
         run: |
           cd frontend/ios/App
-          xcodebuild archive \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -archivePath ./build/App.xcarchive \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+          if [ -f App.xcworkspace ]; then
+            echo "Building with workspace..."
+            xcodebuild archive \
+              -workspace App.xcworkspace \
+              -scheme App \
+              -archivePath ./build/App.xcarchive \
+              -destination 'generic/platform=iOS' \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
+          else
+            echo "Workspace not found, trying project..."
+            ls -la
+            xcodebuild archive \
+              -project App.xcodeproj \
+              -scheme App \
+              -archivePath ./build/App.xcarchive \
+              -destination 'generic/platform=iOS' \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO
+          fi
 
       - name: Upload Unsigned Archive
         if: github.event.inputs.build_type != 'signed'
