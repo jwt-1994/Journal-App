@@ -75,7 +75,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.0'
+          xcode-version: 'latest'
 
       # ========== 未签名构建（开发测试用） ==========
       - name: Build iOS Archive (unsigned)
