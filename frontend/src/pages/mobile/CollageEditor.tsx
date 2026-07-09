@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button, Toast, Popup, Segmented, ColorPicker, Slider, Input, Dialog } from 'antd-mobile';
+import { Button, Toast, Popup, Segmented, Slider, Input, Dialog } from 'antd-mobile';
 import {
   SelectOutlined,
   HighlightOutlined,
@@ -9,10 +9,6 @@ import {
   UndoOutlined,
   RedoOutlined,
   DeleteOutlined,
-  SaveOutlined,
-  FolderOpenOutlined,
-  DownloadOutlined,
-  PlusOutlined,
   EyeOutlined,
   EyeInvisibleOutlined,
   UnorderedListOutlined,
@@ -30,7 +26,6 @@ import {
   createCollage,
   updateCollage,
   deleteCollage,
-  getCategories,
 } from '../../services/api';
 
 // --- 类型 ---
@@ -77,8 +72,6 @@ const CANVAS_PRESETS: { key: string; label: string; w: number; h: number }[] = [
   { key: 'custom', label: '自定义', w: 0, h: 0 },
 ];
 
-const BRUSH_SIZES = [2, 4, 6, 8, 12, 16];
-
 export default function MobileCollageEditor() {
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -87,8 +80,6 @@ export default function MobileCollageEditor() {
   // 数据
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [backgrounds, setBackgrounds] = useState<BackgroundItem[]>([]);
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // 画布
   const [canvasW, setCanvasW] = useState(1080);
@@ -122,7 +113,6 @@ export default function MobileCollageEditor() {
   const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [showLoadSheet, setShowLoadSheet] = useState(false);
   const [showBgSheet, setShowBgSheet] = useState(false);
-  const [showPresetSheet, setShowPresetSheet] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
 
   const [textInput, setTextInput] = useState('');
@@ -152,16 +142,13 @@ export default function MobileCollageEditor() {
   useEffect(() => {
     (async () => {
       try {
-        const [matRes, bgRes, catRes] = await Promise.all([
+        const [matRes, bgRes] = await Promise.all([
           getMaterials({ page_size: 500 }),
           getBackgrounds(),
-          getCategories(),
         ]);
         setMaterials(matRes.data.items || []);
         setBackgrounds(bgRes.data);
-        setCategories(catRes.data);
       } catch { /* ignore */ }
-      finally { setLoading(false); }
     })();
   }, []);
 
@@ -794,9 +781,8 @@ export default function MobileCollageEditor() {
         <div style={{ position: 'fixed', bottom: 110, left: '50%', transform: 'translateX(-50%)', zIndex: 50,
           background: 'rgba(255,255,255,0.95)', borderRadius: 12, padding: '6px 12px',
           display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <ColorPicker value={globalColor} onChange={(_, hex) => setGlobalColor(hex)}>
-            <div style={{ width: 24, height: 24, borderRadius: 12, background: globalColor, border: '2px solid #e8e8e8', cursor: 'pointer' }} />
-          </ColorPicker>
+          <input type="color" value={globalColor} onChange={e => setGlobalColor(e.target.value)}
+            style={{ width: 26, height: 26, borderRadius: 13, border: '2px solid #e8e8e8', cursor: 'pointer', padding: 0, background: 'none' }} />
           {activeTool === 'brush' && (
             <Slider value={brushSize} min={2} max={16} step={2} onChange={v => setBrushSize(v as number)}
               style={{ width: 80, '--adm-color-primary': '#1677ff' }} />
@@ -891,13 +877,11 @@ export default function MobileCollageEditor() {
               {(selectedElement.type === 'rect' || selectedElement.type === 'circle' || selectedElement.type === 'ellipse') && (
                 <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ color: '#999' }}>填充：</span>
-                  <ColorPicker value={selectedElement.fill || '#ffffff80'} onChange={(_, hex) => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, fill: hex } : el))}>
-                    <div style={{ width: 28, height: 28, borderRadius: 14, background: selectedElement.fill || '#fff', border: '2px solid #e8e8e8', cursor: 'pointer' }} />
-                  </ColorPicker>
+                  <input type="color" value={selectedElement.fill || '#ffffff80'} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, fill: e.target.value } : el))}
+                    style={{ width: 28, height: 28, borderRadius: 14, border: '2px solid #e8e8e8', cursor: 'pointer', padding: 0, background: 'none' }} />
                   <span style={{ color: '#999' }}>描边：</span>
-                  <ColorPicker value={selectedElement.stroke || '#000000'} onChange={(_, hex) => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, stroke: hex } : el))}>
-                    <div style={{ width: 28, height: 28, borderRadius: 14, background: selectedElement.stroke || '#000', border: '2px solid #e8e8e8', cursor: 'pointer' }} />
-                  </ColorPicker>
+                  <input type="color" value={selectedElement.stroke || '#000000'} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, stroke: e.target.value } : el))}
+                    style={{ width: 28, height: 28, borderRadius: 14, border: '2px solid #e8e8e8', cursor: 'pointer', padding: 0, background: 'none' }} />
                 </div>
               )}
               {selectedElement.type === 'text' && (
@@ -905,18 +889,16 @@ export default function MobileCollageEditor() {
                   <Input.TextArea value={selectedElement.text} onChange={val => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, text: val } : el))} rows={3} />
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ color: '#999' }}>颜色：</span>
-                    <ColorPicker value={selectedElement.textFill} onChange={(_, hex) => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, textFill: hex } : el))}>
-                      <div style={{ width: 28, height: 28, borderRadius: 14, background: selectedElement.textFill || '#000', border: '2px solid #e8e8e8', cursor: 'pointer' }} />
-                    </ColorPicker>
+                    <input type="color" value={selectedElement.textFill} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, textFill: e.target.value } : el))}
+                      style={{ width: 28, height: 28, borderRadius: 14, border: '2px solid #e8e8e8', cursor: 'pointer', padding: 0, background: 'none' }} />
                   </div>
                 </div>
               )}
               {selectedElement.type === 'brush' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                   <span style={{ color: '#999' }}>颜色：</span>
-                  <ColorPicker value={selectedElement.strokeColor || '#000'} onChange={(_, hex) => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, strokeColor: hex } : el))}>
-                    <div style={{ width: 28, height: 28, borderRadius: 14, background: selectedElement.strokeColor || '#000', border: '2px solid #e8e8e8', cursor: 'pointer' }} />
-                  </ColorPicker>
+                  <input type="color" value={selectedElement.strokeColor || '#000'} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, strokeColor: e.target.value } : el))}
+                    style={{ width: 28, height: 28, borderRadius: 14, border: '2px solid #e8e8e8', cursor: 'pointer', padding: 0, background: 'none' }} />
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

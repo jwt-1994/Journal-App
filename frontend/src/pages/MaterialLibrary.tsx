@@ -54,7 +54,6 @@ export default function MaterialLibrary() {
 
   // 预览
   const [previewSrc, setPreviewSrc] = useState('');
-  const [previewTitle, setPreviewTitle] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
 
   const fetchCategories = async () => {
