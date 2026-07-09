@@ -177,7 +177,50 @@
 
 ---
 
+## P5：免费 iOS 真机测试（无需付费 Apple Developer）
+
+> 详见 [free-signing-proposal.md](./free-signing-proposal.md)
+> iPhone UDID: `00008130-000E08E434E1001C`
+
+### 19. GitHub Actions 导出 IPA
+
+- [ ] 19.1 添加 `xcodebuild -exportArchive` 导出 IPA 步骤
+- [ ] 19.2 配置 ExportOptions.plist（development 模式）
+- [ ] 19.3 上传 IPA 到 GitHub Actions Artifacts
+
+### 20. PWA 部署（推荐，零成本）
+
+- [ ] 20.1 创建 `manifest.json` + PWA meta 标签
+- [ ] 20.2 创建 GitHub Pages 部署工作流
+- [ ] 20.3 生成 App 图标（192x192 + 512x512）
+- [ ] 20.4 iPhone Safari 添加到主屏幕验证
+
+### 21. AltStore 侧载（推荐，完整原生功能）
+
+- [ ] 21.1 Windows 安装 AltServer
+- [ ] 21.2 iPhone 安装 AltStore
+- [ ] 21.3 信任免费开发者证书
+- [ ] 21.4 下载 IPA → AltStore 签名安装
+- [ ] 21.5 验证 7 天自动刷新
+
+### 22. 免费开发者证书 CI（可选）
+
+- [ ] 22.1 获取 Apple ID App-Specific Password
+- [ ] 22.2 配置 GitHub Secrets（FREE_APPLE_ID、FREE_APPLE_APP_PASSWORD、FREE_TEAM_ID）
+- [ ] 22.3 添加自动签名构建 workflow
+- [ ] 22.4 注册设备 UDID 到免费账号
+
+---
+
 ## 优先级说明
+
+| 阶段 | 优先级 | 预计工时 | 交付物 |
+|------|--------|---------|--------|
+| P4A | 🔴 高 | 5-7 天 | ✅ 可运行 iOS App + 素材库 + 云端后端 |
+| P4B | 🔴 高 | 5-7 天 | ✅ 拼贴编辑器完整功能 |
+| P4C | 🟡 中 | 3-5 天 | 🔄 全功能 iOS App |
+| P4D | 🟢 低 | 3-5 天 | App Store 上架版本 |
+| **P5** | 🔴 高 | 1-2 天 | ⬜ 免费真机测试 |
 
 | 阶段 | 优先级 | 预计工时 | 状态 |
 |------|--------|---------|------|
