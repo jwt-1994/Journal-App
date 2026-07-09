@@ -8,18 +8,25 @@ Capacitor iOS 构建最终需要 **Xcode**（仅 macOS），用户当前使用 W
 
 ## 方案对比
 
-| 方案 | 成本 | 复杂度 | 推荐度 | 说明 |
+| 方案 | 成本 | 复杂度 | 推荐度 | 状态 |
 |------|------|--------|--------|------|
-| **A: GitHub Actions** | 免费（公开仓库） | 中 | ⭐⭐⭐⭐⭐ | 推送代码自动构建 iOS |
-| **B: 远程 Mac 服务** | $20-100/月 | 低 | ⭐⭐⭐⭐ | 租用云端 Mac 手动操作 |
-| **C: 本地 Mac 设备** | 硬件成本 | 低 | ⭐⭐⭐⭐ | 买 Mac mini 或 MacBook |
-| **D: Hackintosh** | 时间成本 | 极高 | ⭐ | 不推荐，不稳定 |
-
-> **强烈推荐方案 A：GitHub Actions**，免费且自动化。
+| **A: GitHub Actions** | 免费（公开仓库） | 中 | ⭐⭐⭐⭐⭐ | ✅ 已采用 |
+| **B: 远程 Mac 服务** | $20-100/月 | 低 | ⭐⭐⭐⭐ | 备选 |
+| **C: 本地 Mac 设备** | 硬件成本 | 低 | ⭐⭐⭐⭐ | 备选 |
+| **D: Hackintosh** | 时间成本 | 极高 | ⭐ | 不推荐 |
 
 ---
 
-## 方案 A：GitHub Actions 自动构建（推荐）
+## 方案 A：GitHub Actions 自动构建（✅ 已采用）
+
+### 仓库信息
+
+| 项目 | 值 |
+|------|-----|
+| 仓库地址 | https://github.com/jwt-1994/Journal-App |
+| Workflow | `.github/workflows/ios-build.yml` |
+| 构建状态 | 已推送，首次构建已触发 |
+| 构建方式 | unsigned（免签名）/ signed（加密签名）双模式 |
 
 ### 整体流程
 
@@ -28,141 +35,46 @@ Windows 开发机                    GitHub                     App Store / Test
 ┌──────────┐    git push    ┌──────────────┐   自动上传   ┌──────────────────┐
 │ 编写代码  │ ────────────→ │ GitHub Actions│ ──────────→ │  App Store Connect│
 │ Vite 构建 │               │ (macOS Runner)│             │  TestFlight 分发  │
-│ 本地测试  │               │ Xcode Archive │             │                  │
 └──────────┘               └──────────────┘             └──────────────────┘
 ```
 
-### 步骤 1：创建 GitHub 仓库
+### 构建触发方式
+
+| 触发方式 | 构建类型 | 说明 |
+|---------|---------|------|
+| `git push main` | unsigned | 自动触发，验证编译通过 |
+| 手动触发 `workflow_dispatch` | unsigned / signed | 可选 build_type 和 upload_testflight |
+
+### 已创建的 CI/CD 文件
+
+| 文件 | 用途 |
+|------|------|
+| `.github/workflows/ios-build.yml` | GitHub Actions 工作流（macOS runner, Xcode 16） |
+| `frontend/ExportOptions.plist` | IPA 导出配置（development/ad-hoc） |
+| `.gitignore` | 排除 node_modules/dist/release4/数据库/证书 |
+| `frontend/.gitignore` | 排除 *.asar 和 release4/ |
+
+### 初始化步骤（已完成）
 
 ```bash
 cd C:\Users\AI\Documents\trae_projects\app_project
 git init
 git add .
 git commit -m "init: 手账素材库"
-git remote add origin https://github.com/YOUR_USERNAME/sticker-material.git
+git remote add origin https://github.com/jwt-1994/Journal-App.git
 git push -u origin main
 ```
 
-### 步骤 2：配置 GitHub Actions Workflow
+### 签名配置（需要时再执行）
 
-在项目根目录创建 `.github/workflows/ios-build.yml`：
+详细步骤见 [signing-and-testing.md](signing-and-testing.md)：
 
-```yaml
-name: Build iOS
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:  # 手动触发
-
-jobs:
-  build:
-    runs-on: macos-latest
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Build Web App
-        run: |
-          cd frontend
-          npm run build
-
-      - name: Install Capacitor CLI
-        run: |
-          cd frontend
-          npm install @capacitor/cli @capacitor/ios @capacitor/core
-          npm install @capacitor/camera @capacitor/filesystem @capacitor/share @capacitor/haptics @capacitor/status-bar @capacitor-community/sqlite
-
-      - name: Setup Capacitor iOS
-        run: |
-          cd frontend
-          npx cap init "手账素材库" "com.sticker.material" --web-dir=dist
-          npx cap add ios
-
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '16.0'
-
-      - name: Build iOS Archive
-        run: |
-          cd frontend/ios
-          xcodebuild archive \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -archivePath ./build/App.xcarchive \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Upload Archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-archive
-          path: frontend/ios/build/App.xcarchive
-
-      - name: Export IPA (unsigned)
-        run: |
-          cd frontend/ios
-          xcodebuild -exportArchive \
-            -archivePath ./build/App.xcarchive \
-            -exportPath ./build/export \
-            -exportOptionsPlist ./build/exportOptions.plist
-```
-
-### 步骤 3：导出 IPA 配置
-
-创建 `frontend/ios/exportOptions.plist`：
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>development</string>
-    <key>teamID</key>
-    <string>YOUR_TEAM_ID</string>
-    <key>compileBitcode</key>
-    <false/>
-</dict>
-</plist>
-```
-
-### 步骤 4：配置 App Store Connect API Key
-
-1. 登录 App Store Connect → Users and Access → Keys
-2. 生成 API Key（下载 p8 文件）
-3. 在 GitHub 仓库 Settings → Secrets 中添加：
-   - `APP_STORE_CONNECT_KEY_ID`：Key ID
-   - `APP_STORE_CONNECT_ISSUER_ID`：Issuer ID
-   - `APP_STORE_CONNECT_KEY`：p8 文件内容
-
-### 步骤 5：自动上传到 TestFlight
-
-在 workflow 中添加上传步骤：
-
-```yaml
-- name: Upload to TestFlight
-  uses: Apple-Actions/upload-testflight-build@v1
-  with:
-    app-path: frontend/ios/build/export/App.ipa
-    issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-    api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-    api-private-key: ${{ secrets.APP_STORE_CONNECT_KEY }}
-```
+1. 注册 Apple Developer ($99/年)
+2. Windows 上用 OpenSSL 生成 CSR
+3. 上传 CSR 到 Apple Developer 获取证书
+4. 导出 .p12 + 创建 Provisioning Profile
+5. 配置 GitHub Secrets（IOS_P12_BASE64 等）
+6. 手动触发 signed 构建
 
 ---
 
@@ -204,160 +116,6 @@ jobs:
 
 ---
 
-## 开发阶段推荐方案
-
-### 当前阶段（开发 + 内测）
-
-```
-Windows 开发 → GitHub Actions 自动构建 → TestFlight 分发
-```
-
-- 代码推送到 GitHub → Actions 自动构建 iOS 包
-- 构建结果通过 TestFlight 分发给测试人员
-- 测试人员用 iPhone 安装 TestFlight App 测试
-
-### 开发阶段本地调试
-
-由于 Windows 无法直接运行 iOS 模拟器，建议：
-
-1. **Chrome DevTools 移动模式**：在 Windows 上用 Chrome 模拟 iPhone 屏幕
-   ```
-   打开 Chrome DevTools (F12) → Toggle Device Toolbar (Ctrl+Shift+M)
-   → 选择 iPhone 14 Pro 或 iPhone 15 Pro
-   ```
-   这可以调试大部分 UI 和交互逻辑。
-
-2. **Capacitor Live Reload**：配置 Capacitor 的 livereload 到本地开发服务器
-   ```typescript
-   // capacitor.config.ts
-   const config: CapacitorConfig = {
-     appId: 'com.sticker.material',
-     appName: '手账素材库',
-     webDir: 'dist',
-     server: {
-       url: 'http://192.168.1.xxx:5173',  // 本地开发服务器 IP
-       cleartext: true,
-     },
-   };
-   ```
-   然后在 Mac 上运行 `npx cap sync ios`，Xcode 中运行 App 会加载 Windows 上的开发服务器，实现热更新调试。
-
-3. **云 Mac 附加服务**：需要测试原生功能时（相机、文件系统等），租用云端 Mac 进行真机测试。
-
----
-
-## 方案 D：Ionic Appflow（Capacitor 官方云构建）
-
-**无需 Mac，完全在云端构建 iOS**，且对 Capacitor 项目有原生支持。
-
-| 项目 | 说明 |
-|------|------|
-| 免费额度 | 每月 100 次构建（Hobby 计划） |
-| 付费计划 | $42/月起（含自动化部署） |
-| 支持平台 | iOS、Android 同时构建 |
-| 操作方式 | Web 控制台或 CLI 命令 |
-
-### 使用流程
-
-```bash
-# 1. 安装 Appflow CLI
-npm install -g @ionic/cli
-
-# 2. 登录
-ionic login
-
-# 3. 连接项目
-ionic link
-
-# 4. 推送代码到 Appflow
-git push ionic main
-
-# 5. 在 Web 控制台配置构建
-#   - 选择 iOS 平台
-#   - 配置签名证书（上传 .p12 和 provisioning profile）
-#   - 点击构建
-# 6. 构建完成后下载 IPA 文件
-```
-
-### 优势
-- Capacitor 官方出品，对 Capacitor 项目支持最好
-- 无需 GitHub 仓库
-- 提供证书管理功能
-- 支持 Live Update（热更新，无需重新审核）
-
----
-
-## 方案 E：Codemagic（跨平台 CI/CD）
-
-**免费额度慷慨，支持 Capacitor 项目**。
-
-| 项目 | 说明 |
-|------|------|
-| 免费额度 | 每月 500 分钟（macOS M1 标准机） |
-| 付费计划 | $49/月起 |
-| 支持平台 | iOS、Android、Flutter、React Native |
-
-### 使用流程
-
-```bash
-# 1. 在 codemagic.io 注册账号
-# 2. 连接 GitHub/GitLab 仓库
-# 3. 在项目根目录创建 codemagic.yaml
-```
-
-```yaml
-# codemagic.yaml
-workflows:
-  ios-build:
-    name: iOS Build
-    instance_type: mac_mini_m1
-    max_build_duration: 60
-    environment:
-      node: 20.0.0
-      xcode: 16.0
-    scripts:
-      - name: Install dependencies
-        script: cd frontend && npm ci
-      - name: Build web
-        script: cd frontend && npm run build
-      - name: Setup Capacitor
-        script: |
-          cd frontend
-          npx cap init "手账素材库" "com.sticker.material" --web-dir=dist
-          npx cap add ios
-      - name: Build iOS
-        script: |
-          cd frontend/ios/App
-          xcodebuild archive -workspace App.xcworkspace -scheme App \
-            -archivePath build/App.xcarchive \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE=Manual
-    artifacts:
-      - frontend/ios/App/build/App.xcarchive
-```
-
-### 优势
-- 每月 500 分钟免费，对个人开发者足够
-- 支持 macOS M1 机器，构建速度快
-- 与 Git 仓库集成，推送自动构建
-- 提供 Webhook 通知
-
----
-
-## 方案对比总结
-
-| 方案 | 成本 | 自动化 | 证书管理 | 推荐度 |
-|------|------|--------|---------|--------|
-| GitHub Actions | 免费 | ✅ | 手动 | ⭐⭐⭐⭐⭐ |
-| **Codemagic** | 500分钟/月免费 | ✅ | 内置 | ⭐⭐⭐⭐⭐ |
-| Ionic Appflow | 100次/月免费 | ✅ | 内置 | ⭐⭐⭐⭐ |
-| 云 Mac 租赁 | $20-100/月 | 手动 | 手动 | ⭐⭐⭐ |
-| 本地 Mac | ¥2,000+ | 手动 | 手动 | ⭐⭐⭐ |
-
-> **无 Mac 最佳方案**：**Codemagic**（免费额度 500 分钟/月，内置证书管理，无需任何 Mac 设备）
-
----
-
 ## 无 Mac 开发完整流程
 
 ```
@@ -365,7 +123,7 @@ Windows 开发 → Chrome DevTools 移动模拟调试
      │
      │ git push
      ▼
-GitHub / Codemagic → 云端 macOS 自动构建 iOS
+GitHub → macOS Runner 自动构建 iOS
      │
      │ API 上传
      ▼
@@ -420,12 +178,24 @@ openssl req -new -key ios_distribution.key -out ios_distribution.csr -subj "/ema
 
 ---
 
-## 总结
+## 方案对比总结
 
-| 阶段 | 工具 | 说明 |
-|------|------|------|
-| 日常开发 | Windows + Chrome DevTools | 移动端模拟调试 |
-| 构建打包 | **Codemagic**（推荐）或 GitHub Actions | 云端自动构建 IPA |
-| 内测分发 | TestFlight | 邀请测试人员 |
-| 证书管理 | Apple Developer + Codemagic | 云端管理证书 |
-| 原生功能测试 | 云端 Mac 或借用 Mac | 真机调试
+| 方案 | 成本 | 自动化 | 证书管理 | 状态 |
+|------|------|--------|---------|------|
+| **GitHub Actions** | 免费 | ✅ | 手动 | ✅ 已采用 |
+| Codemagic | 500分钟/月免费 | ✅ | 内置 | 备选 |
+| Ionic Appflow | 100次/月免费 | ✅ | 内置 | 备选 |
+| 云 Mac 租赁 | $20-100/月 | 手动 | 手动 | 备选 |
+| 本地 Mac | ¥2,000+ | 手动 | 手动 | 备选 |
+
+---
+
+## 签名与本地测试
+
+详见 [signing-and-testing.md](signing-and-testing.md)，包含：
+- OpenSSL CSR 生成步骤
+- Apple Developer 证书创建流程
+- GitHub Secrets 配置
+- IPA 安装到 iPhone 真机的三种方式
+- 本地开发调试方案
+- 常见问题排查

@@ -21,6 +21,8 @@ jobs:
   build-ios:
     runs-on: macos-latest
     timeout-minutes: 30
+    env:
+      HAS_APP_STORE_KEY: ${{ secrets.APP_STORE_CONNECT_KEY_ID != '' }}
 
     steps:
       - name: Checkout
@@ -130,7 +132,7 @@ jobs:
 
       # ========== 上传到 TestFlight（可选） ==========
       - name: Upload to TestFlight
-        if: github.event.inputs.build_type == 'signed' && secrets.APP_STORE_CONNECT_KEY_ID != ''
+        if: github.event.inputs.build_type == 'signed' && env.HAS_APP_STORE_KEY == 'true'
         uses: Apple-Actions/upload-testflight-build@v1
         with:
           app-path: frontend/ios/App/build/export/*.ipa
