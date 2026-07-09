@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Button, Selector, Input, Switch, Form, ProgressBar, Toast, ImageUploader, TextArea } from 'antd-mobile';
+import { useState, useEffect, useRef } from 'react';
+import { Button, Selector, Input, Switch, Form, ProgressBar, Toast, ImageUploader } from 'antd-mobile';
+import type { ImageUploadItem } from 'antd-mobile/es/components/image-uploader';
 import { getCategories, uploadMaterial } from '../../services/api';
 
 interface Category {
@@ -15,6 +16,7 @@ export default function MobileUploadPage() {
   const [materialName, setMaterialName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const fileMap = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
     getCategories().then(res => setCategories(res.data)).catch(() => {});
@@ -62,20 +64,22 @@ export default function MobileUploadPage() {
         <Form.Item label="选择图片">
           <ImageUploader
             value={images.map(img => ({ url: img.url }))}
-            onChange={(_items, files) => {
-              const newImages = files.map((f: File) => ({
-                url: URL.createObjectURL(f),
-                file: f,
+            onChange={(items: ImageUploadItem[]) => {
+              const newImages = items.map((item: ImageUploadItem) => ({
+                url: item.url,
+                file: fileMap.current.get(item.url) || new File([], ''),
               }));
               setImages(newImages);
             }}
-            upload={async (file: File) => {
+            upload={async (file: File): Promise<ImageUploadItem> => {
               const isImage = file.type.startsWith('image/');
               if (!isImage) {
                 Toast.show({ content: '请选择图片文件', icon: 'fail' });
-                return null;
+                throw new Error('not image');
               }
-              return { url: URL.createObjectURL(file) };
+              const url = URL.createObjectURL(file);
+              fileMap.current.set(url, file);
+              return { url };
             }}
             multiple
             accept="image/*"

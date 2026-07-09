@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button, Toast, Popup, Segmented, Slider, Input, Dialog, TextArea } from 'antd-mobile';
+import { Button, Toast, Popup, Segmented, Slider, Input, Dialog } from 'antd-mobile';
 import {
   SelectOutlined,
   HighlightOutlined,
@@ -886,7 +886,8 @@ export default function MobileCollageEditor() {
               )}
               {selectedElement.type === 'text' && (
                 <div style={{ marginBottom: 8 }}>
-                  <TextArea value={selectedElement.text} onChange={(val: string) => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, text: val } : el))} rows={3} />
+                  <textarea value={selectedElement.text} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, text: e.target.value } : el))} rows={3}
+                    style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #e8e8e8', fontSize: 14, resize: 'vertical' }} />
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ color: '#999' }}>颜色：</span>
                     <input type="color" value={selectedElement.textFill} onChange={e => setElements(prev => prev.map(el => el.id === selectedId ? { ...el, textFill: e.target.value } : el))}
@@ -986,7 +987,7 @@ export default function MobileCollageEditor() {
       <Dialog
         visible={showTextInput}
         title="输入文字"
-        content={<TextArea value={textInput} onChange={(val: string) => setTextInput(val)} rows={3} placeholder="输入文字内容..." />}
+        content={<textarea value={textInput} onChange={e => setTextInput(e.target.value)} rows={3} placeholder="输入文字内容..." style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #e8e8e8', fontSize: 14, resize: 'vertical' }} />}
         onClose={() => setShowTextInput(false)}
         actions={[
           { key: 'cancel', text: '取消', onClick: () => setShowTextInput(false) },

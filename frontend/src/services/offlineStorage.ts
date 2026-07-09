@@ -3,15 +3,6 @@
  * 在 Capacitor 环境中使用 SQLite 插件，在 Web 环境中使用 localStorage 回退
  */
 
-// 检测 Capacitor 环境
-const isCapacitor = (): boolean => {
-  try {
-    return !!(window as any).Capacitor?.isPluginAvailable?.('CapacitorSQLite');
-  } catch {
-    return false;
-  }
-};
-
 // 简单的内存/本地存储回退
 class LocalStorage {
   private prefix = 'sticker_';

@@ -225,7 +225,7 @@ export default function MobileMaterialLibrary() {
       </div>
 
       {/* 图片预览 */}
-      <ImageViewer
+      <ImageViewer.Multi
         images={previewImages}
         visible={previewVisible}
         defaultIndex={previewIndex}

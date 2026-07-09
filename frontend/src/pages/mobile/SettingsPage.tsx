@@ -12,19 +12,15 @@ interface Category {
 
 export default function MobileSettingsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [newName, setNewName] = useState('');
 
   const fetchCategories = async () => {
-    setLoading(true);
     try {
       const res = await getCategories();
       setCategories(res.data);
     } catch {
       Toast.show({ content: '加载失败', icon: 'fail' });
-    } finally {
-      setLoading(false);
     }
   };
 
