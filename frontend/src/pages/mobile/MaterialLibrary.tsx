@@ -43,6 +43,7 @@ export default function MobileMaterialLibrary() {
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
 
@@ -76,7 +77,7 @@ export default function MobileMaterialLibrary() {
 
   const fetchMaterials = async (pageNum: number, reset: boolean) => {
     const currentFetchId = ++fetchIdRef.current;
-    if (reset) setLoading(true);
+    if (reset) { setLoading(true); setError(false); }
     try {
       const params: Record<string, unknown> = {
         page: pageNum,
@@ -98,7 +99,7 @@ export default function MobileMaterialLibrary() {
     } catch {
       if (currentFetchId !== fetchIdRef.current) return;
       if (reset) {
-        setMaterials([]);
+        setError(true);
         Toast.show({ content: '加载素材失败，请检查网络', icon: 'fail' });
       }
     } finally {
@@ -255,6 +256,13 @@ export default function MobileMaterialLibrary() {
               <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
                 <SpinLoading color="primary" />
               </div>
+            ) : error && materials.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 12 }}>
+                <span style={{ color: '#999' }}>加载失败，请检查网络</span>
+                <Button size="small" color="primary" onClick={() => { setError(false); setLoading(true); fetchMaterials(1, true); }}>
+                  点击重试
+                </Button>
+              </div>
             ) : materials.length === 0 && !loading ? (
               <ErrorBlock status="empty" title="暂无素材" description="去上传页面上传素材吧" style={{ padding: '48px 0' }} />
             ) : (
@@ -277,9 +285,9 @@ export default function MobileMaterialLibrary() {
                         }
                       }}
                     >
-                      {/* 多选勾选框 */}
+                      {/* 多选勾选框（纯视觉，点击穿透到父元素） */}
                       {selectMode && (
-                        <div style={{ position: 'absolute', top: 2, right: 2, zIndex: 10 }}>
+                        <div style={{ position: 'absolute', top: 2, right: 2, zIndex: 10, pointerEvents: 'none' }}>
                           <Checkbox checked={isSelected} />
                         </div>
                       )}

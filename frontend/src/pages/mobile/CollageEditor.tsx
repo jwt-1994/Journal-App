@@ -221,8 +221,12 @@ export default function MobileCollageEditor() {
         material_id: m.id, img,
       };
       setElements(prev => [...prev, el]);
+      setShowMaterialSheet(false);
     };
-    setShowMaterialSheet(false);
+    img.onerror = () => {
+      Toast.show({ content: '素材加载失败', icon: 'fail' });
+      setShowMaterialSheet(false);
+    };
   };
 
   // --- 重置缩放/平移 ---
@@ -883,7 +887,7 @@ export default function MobileCollageEditor() {
       </div>
 
       {/* 素材库弹出面板 */}
-      <Popup visible={showMaterialSheet} onClose={() => setShowMaterialSheet(false)} position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showMaterialSheet} onClose={() => setShowMaterialSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>选择素材</h3>
           <Input placeholder="搜索素材..." value={materialSearch} onChange={setMaterialSearch} clearable style={{ marginBottom: 12 }} />
