@@ -1,8 +1,10 @@
 import os
+from io import BytesIO
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
+from PIL import Image
 
 from database import get_db
 from models import Material
@@ -33,13 +35,20 @@ def get_material(material_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{material_id}/file")
-def get_material_file(material_id: int, db: Session = Depends(get_db)):
+def get_material_file(material_id: int, thumb: int = Query(0), db: Session = Depends(get_db)):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         return {"error": "素材不存在"}
     file_full_path = os.path.join(DATA_DIR, material.file_path)
     if not os.path.exists(file_full_path):
         return {"error": "文件不存在"}
+    if thumb > 0:
+        img = Image.open(file_full_path)
+        img.thumbnail((thumb, thumb), Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format='JPEG', quality=75)
+        buf.seek(0)
+        return StreamingResponse(buf, media_type="image/jpeg")
     return FileResponse(file_full_path)
 
 

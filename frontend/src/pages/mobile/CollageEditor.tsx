@@ -23,6 +23,7 @@ import {
   getBackgrounds,
   getBackgroundFileUrl,
   getMaterialFileUrl,
+  getMaterialThumbUrl,
   getCollages,
   getCollage,
   createCollage,
@@ -90,6 +91,7 @@ export default function MobileCollageEditor() {
   const [presetKey, setPresetKey] = useState('phone_9_16');
   const [scale, setScale] = useState(1);
   const [showCanvasSetup, setShowCanvasSetup] = useState(true);
+  const [setupStep, setSetupStep] = useState(1); // 1=选规格, 2=选背景
 
   // 背景
   const [selectedBgId, setSelectedBgId] = useState<number | null>(null);
@@ -577,6 +579,7 @@ export default function MobileCollageEditor() {
 
   const handleNew = () => {
     setShowCanvasSetup(true);
+    setSetupStep(1);
     setElements([]); setCollageId(null); setCollageName('');
     setSelectedBgId(null); setUndoStack([]); setRedoStack([]); setSelectedId(null);
   };
@@ -621,46 +624,61 @@ export default function MobileCollageEditor() {
 
   const filteredMaterials = materials.filter(m => !materialSearch || m.original_name.toLowerCase().includes(materialSearch.toLowerCase()));
 
-  // --- 画布设置界面 ---
+  // --- 画布设置界面（分步） ---
   if (showCanvasSetup) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', padding: 16, background: '#f5f5f5' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Button size="small" fill="none" onClick={() => navigate(-1)}>
-            <LeftOutlined /> 返回
+          <Button size="small" fill="none" onClick={() => {
+            if (setupStep === 1) navigate(-1);
+            else setSetupStep(1);
+          }}>
+            <LeftOutlined /> {setupStep === 1 ? '返回' : '上一步'}
           </Button>
         </div>
-        <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>新建画布</h2>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ marginBottom: 8, fontWeight: 500, fontSize: 14 }}>选择尺寸类型</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-            {CANVAS_PRESETS.map(p => (
-              <div key={p.key}
-                onClick={() => {
-                  setPresetKey(p.key);
-                  if (p.key !== 'custom') { setCanvasW(p.w); setCanvasH(p.h); }
-                }}
-                style={{
-                  padding: 12, border: presetKey === p.key ? '2px solid #1677ff' : '1px solid #e8e8e8',
-                  borderRadius: 8, cursor: 'pointer', background: presetKey === p.key ? '#e6f4ff' : '#fff',
-                }}
-              >
-                <div style={{ fontWeight: 500, fontSize: 14 }}>{p.label}</div>
-                {p.key !== 'custom' && <div style={{ fontSize: 12, color: '#999' }}>{p.w} x {p.h} px</div>}
+        {/* Step 1：选择画布尺寸 */}
+        {setupStep === 1 && (
+          <>
+            <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>选择画布尺寸</h2>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                {CANVAS_PRESETS.map(p => (
+                  <div key={p.key}
+                    onClick={() => {
+                      setPresetKey(p.key);
+                      if (p.key !== 'custom') { setCanvasW(p.w); setCanvasH(p.h); }
+                    }}
+                    style={{
+                      padding: 16, border: presetKey === p.key ? '2px solid #1677ff' : '1px solid #e8e8e8',
+                      borderRadius: 12, cursor: 'pointer', background: presetKey === p.key ? '#e6f4ff' : '#fff',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    <div style={{ fontWeight: 500, fontSize: 15 }}>{p.label}</div>
+                    {p.key !== 'custom' && <div style={{ fontSize: 12, color: '#999' }}>{p.w} x {p.h} px</div>}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+            <Button block color="primary" size="large" onClick={() => setSetupStep(2)} style={{ marginTop: 16 }}>
+              下一步：选择背景
+            </Button>
+          </>
+        )}
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ marginBottom: 8, fontWeight: 500, fontSize: 14 }}>选择背景</div>
-          {renderBgCards()}
-        </div>
-
-        <Button block color="primary" size="large" onClick={handleCreateCanvas}>
-          创建画布
-        </Button>
+        {/* Step 2：选择背景 */}
+        {setupStep === 2 && (
+          <>
+            <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>选择背景</h2>
+            <div style={{ flex: 1 }}>
+              {renderBgCards()}
+            </div>
+            <Button block color="primary" size="large" onClick={handleCreateCanvas} style={{ marginTop: 16 }}>
+              确认，开始拼贴
+            </Button>
+          </>
+        )}
       </div>
     );
   }
@@ -863,7 +881,7 @@ export default function MobileCollageEditor() {
               <div key={m.id} onClick={() => addMaterial(m)}
                 style={{ cursor: 'pointer', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', textAlign: 'center' }}>
                 <div style={{ width: '100%', aspectRatio: '1', background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src={m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialFileUrl(m.id)}
+                  <img src={m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialThumbUrl(m.id, 200)}
                     alt={m.original_name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 </div>
                 <div style={{ fontSize: 11, padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
