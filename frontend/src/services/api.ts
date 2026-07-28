@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { isOnline } from './offlineStorage';
 
-// 云端后端地址（部署后修改为实际域名）
-const CLOUD_API_URL = 'https://api.sticker.example.com/api';
+// 云端后端地址：手机连接电脑的局域网 IP
+// 如果电脑 IP 变了，在这里修改即可
+const CLOUD_API_URL = 'http://172.17.246.41:8000/api';
 
 // 检测运行环境
 const isCapacitorNative = (): boolean => {

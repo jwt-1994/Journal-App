@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button, Toast, Popup, Segmented, Slider, Input, Dialog } from 'antd-mobile';
+import { useNavigate } from 'react-router-dom';
 import {
   SelectOutlined,
   HighlightOutlined,
@@ -12,6 +13,7 @@ import {
   EyeOutlined,
   EyeInvisibleOutlined,
   UnorderedListOutlined,
+  LeftOutlined,
 } from '@ant-design/icons';
 import { Stage, Layer, Image as KonvaImage, Transformer, Line, Rect, Circle, Ellipse, Text } from 'react-konva';
 import Konva from 'konva';
@@ -76,6 +78,7 @@ export default function MobileCollageEditor() {
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // 数据
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
@@ -622,7 +625,12 @@ export default function MobileCollageEditor() {
   if (showCanvasSetup) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', padding: 16, background: '#f5f5f5' }}>
-        <h2 style={{ textAlign: 'center', margin: '16px 0' }}>新建画布</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Button size="small" fill="none" onClick={() => navigate(-1)}>
+            <LeftOutlined /> 返回
+          </Button>
+        </div>
+        <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>新建画布</h2>
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ marginBottom: 8, fontWeight: 500, fontSize: 14 }}>选择尺寸类型</div>
@@ -833,6 +841,8 @@ export default function MobileCollageEditor() {
 
       {/* 快捷操作按钮 */}
       <div style={{ position: 'fixed', top: 16, left: 16, display: 'flex', gap: 8, zIndex: 50 }}>
+        <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
+          onClick={() => navigate(-1)}><LeftOutlined /> 返回</Button>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
           onClick={handleNew}>新建</Button>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}

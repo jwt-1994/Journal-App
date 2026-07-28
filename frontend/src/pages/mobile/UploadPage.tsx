@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Selector, Input, Switch, Form, ProgressBar, Toast, ImageUploader } from 'antd-mobile';
+import { Button, Selector, Input, Switch, Form, ProgressBar, Toast, ImageUploader, SpinLoading } from 'antd-mobile';
 import type { ImageUploadItem } from 'antd-mobile/es/components/image-uploader';
 import { getCategories, uploadMaterial } from '../../services/api';
 
@@ -10,6 +10,7 @@ interface Category {
 
 export default function MobileUploadPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [images, setImages] = useState<{ url: string; file: File }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>();
   const [autoRemoveBg, setAutoRemoveBg] = useState(true);
@@ -19,7 +20,13 @@ export default function MobileUploadPage() {
   const fileMap = useRef<Map<string, File>>(new Map());
 
   useEffect(() => {
-    getCategories().then(res => setCategories(res.data)).catch(() => {});
+    setCategoriesLoading(true);
+    getCategories()
+      .then(res => { setCategories(res.data); setCategoriesLoading(false); })
+      .catch(() => {
+        setCategoriesLoading(false);
+        Toast.show({ content: '加载分类失败，请检查网络连接', icon: 'fail' });
+      });
   }, []);
 
   const handleUpload = async () => {
@@ -105,12 +112,20 @@ export default function MobileUploadPage() {
         </Form.Item>
 
         <Form.Item label="选择分类">
-          <Selector
-            value={selectedCategory ? [selectedCategory] : []}
-            onChange={arr => setSelectedCategory(arr.length > 0 ? arr[0] as number : undefined)}
-            options={categories.map(c => ({ label: c.name, value: c.id }))}
-            showCheckMark={false}
-          />
+          {categoriesLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8 }}>
+              <SpinLoading style={{ '--size': '16px' }} /> 加载中...
+            </div>
+          ) : categories.length === 0 ? (
+            <div style={{ color: '#999', padding: 8, fontSize: 13 }}>暂无分类，请先在设置中添加分类</div>
+          ) : (
+            <Selector
+              value={selectedCategory ? [selectedCategory] : []}
+              onChange={arr => setSelectedCategory(arr.length > 0 ? arr[0] as number : undefined)}
+              options={categories.map(c => ({ label: c.name, value: c.id }))}
+              showCheckMark={false}
+            />
+          )}
         </Form.Item>
       </Form>
 

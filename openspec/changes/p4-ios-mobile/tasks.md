@@ -182,49 +182,48 @@
 > 详见 [free-signing-proposal.md](./free-signing-proposal.md)
 > iPhone UDID: `00008130-000E08E434E1001C`
 
-### 19. GitHub Actions 导出 IPA
+### 19. GitHub Actions 导出 IPA ✅ 已完成
 
-- [ ] 19.1 添加 `xcodebuild -exportArchive` 导出 IPA 步骤
-- [ ] 19.2 配置 ExportOptions.plist（development 模式）
-- [ ] 19.3 上传 IPA 到 GitHub Actions Artifacts
+- [x] 19.1 IPA 导出（手动 zip 打包，绕过 xcodebuild export 团队签名要求）
+- [x] 19.2 配置 ExportOptions-unsigned.plist（development 模式）
+- [x] 19.3 上传 IPA 到 GitHub Actions Artifacts（7天保留）
 
-### 20. PWA 部署（推荐，零成本）
+### 20. PWA 部署（可选，零成本）✅ 已完成
 
-- [ ] 20.1 创建 `manifest.json` + PWA meta 标签
-- [ ] 20.2 创建 GitHub Pages 部署工作流
-- [ ] 20.3 生成 App 图标（192x192 + 512x512）
-- [ ] 20.4 iPhone Safari 添加到主屏幕验证
+- [x] 20.1 创建 `manifest.json` + PWA meta 标签（apple-mobile-web-app）
+- [x] 20.2 创建 GitHub Pages 部署工作流（`.github/workflows/deploy-pwa.yml`）
+- [x] 20.3 生成 App 图标（SVG favicon，PNG 占位）
+- [ ] 20.4 iPhone Safari 添加到主屏幕验证（待用户测试）
 
-### 21. AltStore 侧载（推荐，完整原生功能）
+### 21. SideStore 侧载（推荐，完整原生功能）✅ 已完成
 
-- [ ] 21.1 Windows 安装 AltServer
-- [ ] 21.2 iPhone 安装 AltStore
-- [ ] 21.3 信任免费开发者证书
-- [ ] 21.4 下载 IPA → AltStore 签名安装
-- [ ] 21.5 验证 7 天自动刷新
+- [x] 21.1 Windows 安装 iLoader + iTunes 驱动
+- [x] 21.2 iPhone 安装 SideStore（通过 iLoader USB 安装）
+- [x] 21.3 信任免费开发者证书
+- [ ] 21.4 下载 IPA → SideStore 签名安装（待 Git 构建产物下载）
+- [ ] 21.5 验证 7 天自动刷新（LocalDevVPN + SideStore 无线刷新）
 
-### 22. 免费开发者证书 CI（可选）
+### 22. 免费开发者证书 CI（可选，暂不实现）⏳ 跳过
 
 - [ ] 22.1 获取 Apple ID App-Specific Password
-- [ ] 22.2 配置 GitHub Secrets（FREE_APPLE_ID、FREE_APPLE_APP_PASSWORD、FREE_TEAM_ID）
+- [ ] 22.2 配置 GitHub Secrets
 - [ ] 22.3 添加自动签名构建 workflow
 - [ ] 22.4 注册设备 UDID 到免费账号
+- > 直接用 SideStore 手动签名安装即可，无需 CI 自动化签名
 
 ---
 
 ## 优先级说明
 
-| 阶段 | 优先级 | 预计工时 | 交付物 |
-|------|--------|---------|--------|
-| P4A | 🔴 高 | 5-7 天 | ✅ 可运行 iOS App + 素材库 + 云端后端 |
-| P4B | 🔴 高 | 5-7 天 | ✅ 拼贴编辑器完整功能 |
-| P4C | 🟡 中 | 3-5 天 | 🔄 全功能 iOS App |
-| P4D | 🟢 低 | 3-5 天 | App Store 上架版本 |
-| **P5** | 🔴 高 | 1-2 天 | ⬜ 免费真机测试 |
-
 | 阶段 | 优先级 | 预计工时 | 状态 |
 |------|--------|---------|------|
 | P4A | 🔴 高 | 5-7 天 | ✅ 完成 |
 | P4B | 🔴 高 | 5-7 天 | ✅ 完成 |
-| P4C | 🟡 中 | 3-5 天 | 🔄 进行中 |
-| P4D | 🟢 低 | 3-5 天 | ⏳ 待开始 |
+| P4C | 🟡 中 | 3-5 天 | ✅ 基本完成 |
+| P4D | 🟢 低 | 3-5 天 | ⏭️ 跳过（暂不需要上架） |
+| **P5** | 🔴 高 | 1-2 天 | ✅ 完成 |
+
+> **归档时间**: 2026-07-09
+> **最终方案**: GitHub Actions 构建 unsigned IPA → SideStore 侧载安装到 iPhone
+> **iPhone UDID**: `00008130-000E08E434E1001C`
+> **GitHub 仓库**: https://github.com/jwt-1994/Journal-App |

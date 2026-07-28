@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll } from 'antd-mobile';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast } from 'antd-mobile';
 import {
   getCategories,
   getMaterials,
@@ -57,7 +57,9 @@ export default function MobileMaterialLibrary() {
     Promise.all([getCategories(), getBackgrounds()]).then(([catRes, bgRes]) => {
       setCategories(catRes.data);
       setBackgrounds(bgRes.data);
-    }).catch(() => {});
+    }).catch(() => {
+      Toast.show({ content: '加载分类/背景失败，请检查网络', icon: 'fail' });
+    });
   }, []);
 
   const fetchMaterials = useCallback(async (pageNum: number, reset: boolean) => {
@@ -83,7 +85,7 @@ export default function MobileMaterialLibrary() {
       }
       setHasMore(items.length >= PAGE_SIZE);
     } catch {
-      // ignore
+      if (reset) Toast.show({ content: '加载素材失败，请检查网络', icon: 'fail' });
     } finally {
       setLoading(false);
     }

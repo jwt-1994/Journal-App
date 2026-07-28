@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, List, Dialog, SpinLoading, ErrorBlock, SwipeAction, Input } from 'antd-mobile';
+import { Button, List, Dialog, SpinLoading, ErrorBlock, SwipeAction, Input, Toast } from 'antd-mobile';
 import { useNavigate } from 'react-router-dom';
 import { getCollages, deleteCollage, renameCollage } from '../../services/api';
 
@@ -25,8 +25,8 @@ export default function MobileJournalNotebook() {
     try {
       const res = await getCollages();
       setCollages(res.data);
-    } catch {
-      // ignore
+    } catch (err) {
+      Toast.show({ content: '加载拼贴方案失败，请检查网络', icon: 'fail' });
     } finally {
       setLoading(false);
     }
