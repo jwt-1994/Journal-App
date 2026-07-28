@@ -8,6 +8,36 @@ interface Category {
   name: string;
 }
 
+// 图片压缩：限制最大宽度 1920px，避免大图导致内存崩溃
+function compressImage(file: File, maxWidth = 1920): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      if (img.width <= maxWidth) {
+        resolve(file); // 不需要压缩
+        return;
+      }
+      const scale = maxWidth / img.width;
+      const canvas = document.createElement('canvas');
+      canvas.width = maxWidth;
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        blob => {
+          if (blob) resolve(blob);
+          else resolve(file); // 压缩失败，用原图
+        },
+        file.type || 'image/jpeg',
+        0.85,
+      );
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function MobileUploadPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -47,7 +77,11 @@ export default function MobileUploadPage() {
 
     for (let i = 0; i < images.length; i++) {
       try {
-        await uploadMaterial(images[i].file, selectedCategory, autoRemoveBg, materialName);
+        const compressed = await compressImage(images[i].file);
+        const fileToUpload = compressed instanceof Blob
+          ? new File([compressed], images[i].file.name, { type: images[i].file.type || 'image/jpeg' })
+          : images[i].file;
+        await uploadMaterial(fileToUpload, selectedCategory, autoRemoveBg, materialName);
         success++;
       } catch {
         failed++;

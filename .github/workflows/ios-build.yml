@@ -55,6 +55,24 @@ jobs:
           npx cap add ios
           npx cap sync ios
 
+      - name: Add iOS Permissions
+        run: |
+          cd frontend/ios/App/App
+          if [ -f Info.plist ]; then
+            # 添加相机权限描述（拍照闪退修复）
+            if ! grep -q "NSCameraUsageDescription" Info.plist; then
+              plutil -insert NSCameraUsageDescription -string "需要使用相机拍摄素材照片" Info.plist
+            fi
+            if ! grep -q "NSPhotoLibraryUsageDescription" Info.plist; then
+              plutil -insert NSPhotoLibraryUsageDescription -string "需要访问相册选择素材" Info.plist
+            fi
+            if ! grep -q "NSPhotoLibraryAddUsageDescription" Info.plist; then
+              plutil -insert NSPhotoLibraryAddUsageDescription -string "需要保存素材到相册" Info.plist
+            fi
+            echo "=== Info.plist permissions ==="
+            plutil -p Info.plist | grep -E "Usage|Camera|Photo"
+          fi
+
       - name: Install CocoaPods
         run: |
           cd frontend

@@ -799,7 +799,7 @@ export default function MobileCollageEditor() {
       )}
 
       {/* 缩放指示 + 重置按钮 */}
-      <div style={{ position: 'fixed', top: 50, right: 16, display: 'flex', gap: 8, zIndex: 50 }}>
+      <div style={{ position: 'fixed', top: 60, right: 16, display: 'flex', gap: 8, zIndex: 50 }}>
         <Button size="mini" fill="none" style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', borderRadius: 12, fontSize: 12 }}
           onClick={() => resetView()}>
           {Math.round(scale * 100)}%
@@ -839,8 +839,8 @@ export default function MobileCollageEditor() {
         </div>
       )}
 
-      {/* 快捷操作按钮 — 避开 iOS 状态栏（safe-area + 状态栏约 50px） */}
-      <div style={{ position: 'fixed', top: 50, left: 16, display: 'flex', gap: 8, zIndex: 50, flexWrap: 'wrap' }}>
+      {/* 快捷操作按钮 — 避开 iOS 状态栏（Dynamic Island 约 60px） */}
+      <div style={{ position: 'fixed', top: 60, left: 16, display: 'flex', gap: 8, zIndex: 50, flexWrap: 'wrap' }}>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
           onClick={() => navigate(-1)}><LeftOutlined /> 返回</Button>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
@@ -862,7 +862,7 @@ export default function MobileCollageEditor() {
             {filteredMaterials.map(m => (
               <div key={m.id} onClick={() => addMaterial(m)}
                 style={{ cursor: 'pointer', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', textAlign: 'center' }}>
-                <div style={{ width: '100%', aspectRatio: '1', background: 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '100%', aspectRatio: '1', background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <img src={m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialFileUrl(m.id)}
                     alt={m.original_name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 </div>

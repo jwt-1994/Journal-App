@@ -10,11 +10,18 @@ const config: CapacitorConfig = {
       style: 'dark',
       backgroundColor: '#ffffff',
     },
+    Camera: {
+      usageDescription: '需要使用相机拍摄素材照片',
+      permissions: {
+        ios: 'camera',
+      },
+    },
   },
   ios: {
     contentInset: 'automatic',
     allowsLinkPreview: true,
     scrollEnabled: false,
+    limitsNavigationsToAppBoundDomains: true,
   },
 };
 

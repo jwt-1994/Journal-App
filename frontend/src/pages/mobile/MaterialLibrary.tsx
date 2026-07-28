@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, SwipeAction, Dialog } from 'antd-mobile';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, ActionSheet, Dialog } from 'antd-mobile';
+import { CloseOutline } from 'antd-mobile-icons';
 import {
   getCategories,
   getMaterials,
@@ -135,10 +136,14 @@ export default function MobileMaterialLibrary() {
   };
 
   const handleDelete = (id: number) => {
-    Dialog.confirm({
+    const result = Dialog.confirm({
       title: '确定删除此素材？',
       content: '删除后不可恢复',
-      onConfirm: async () => {
+      confirmText: '删除',
+      cancelText: '取消',
+    });
+    result.then(async (confirmed) => {
+      if (confirmed) {
         try {
           await deleteMaterial(id);
           setMaterials(prev => prev.filter(m => m.id !== id));
@@ -146,7 +151,7 @@ export default function MobileMaterialLibrary() {
         } catch {
           Toast.show({ content: '删除失败', icon: 'fail' });
         }
-      },
+      }
     });
   };
 
@@ -227,25 +232,18 @@ export default function MobileMaterialLibrary() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {materials.map((m, idx) => (
-                  <SwipeAction
+                  <div
                     key={m.id}
-                    rightActions={[
-                      {
-                        key: 'delete',
-                        text: '删除',
-                        color: 'danger',
-                        onClick: () => handleDelete(m.id),
-                      },
-                    ]}
+                    style={{
+                      position: 'relative',
+                      border: '1px solid #f0f0f0',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      background: '#fff',
+                    }}
                   >
                     <div
                       onClick={() => handleImageClick(getImageSrc(m), materials.map(x => getImageSrc(x)), idx)}
-                      style={{
-                        border: '1px solid #f0f0f0',
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        background: '#fff',
-                      }}
                     >
                       <div
                         style={{
@@ -254,7 +252,7 @@ export default function MobileMaterialLibrary() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px',
+                          background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px',
                         }}
                       >
                         <img
@@ -266,7 +264,26 @@ export default function MobileMaterialLibrary() {
                       </div>
                       <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
                     </div>
-                  </SwipeAction>
+                    {/* 删除按钮 */}
+                    <div
+                      onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        background: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10,
+                      }}
+                    >
+                      <CloseOutline style={{ color: '#fff', fontSize: 14 }} />
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
