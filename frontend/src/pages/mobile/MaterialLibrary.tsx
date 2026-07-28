@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, ActionSheet, Dialog } from 'antd-mobile';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Dialog } from 'antd-mobile';
 import { CloseOutline } from 'antd-mobile-icons';
 import {
   getCategories,

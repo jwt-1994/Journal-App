@@ -10,7 +10,7 @@ interface Category {
 
 // 图片压缩：限制最大宽度 1920px，避免大图导致内存崩溃
 function compressImage(file: File, maxWidth = 1920): Promise<Blob> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       if (img.width <= maxWidth) {
