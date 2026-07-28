@@ -23,6 +23,7 @@ import {
   getBackgrounds,
   getBackgroundFileUrl,
   getMaterialFileUrl,
+  getRemovedFileUrl,
   getMaterialThumbUrl,
   getCollages,
   getCollage,
@@ -209,8 +210,8 @@ export default function MobileCollageEditor() {
     saveState();
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
-    img.src = m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialFileUrl(m.id);
-    img.onload = () => {
+    const url = m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id);
+    const onLoad = () => {
       const s = Math.min(200 / img.width, 200 / img.height);
       const el: CanvasElement = {
         id: genId(), type: 'image',
@@ -223,10 +224,14 @@ export default function MobileCollageEditor() {
       setElements(prev => [...prev, el]);
       setShowMaterialSheet(false);
     };
+    img.onload = onLoad;
     img.onerror = () => {
       Toast.show({ content: '素材加载失败', icon: 'fail' });
       setShowMaterialSheet(false);
     };
+    img.src = url;
+    // 兜底：缓存图片可能已完成加载，onload 不会触发
+    if (img.complete) onLoad();
   };
 
   // --- 重置缩放/平移 ---
@@ -896,7 +901,7 @@ export default function MobileCollageEditor() {
               <div key={m.id} onClick={() => addMaterial(m)}
                 style={{ cursor: 'pointer', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', textAlign: 'center' }}>
                 <div style={{ width: '100%', aspectRatio: '1', background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src={m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialThumbUrl(m.id, 200)}
+                  <img src={m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialThumbUrl(m.id, 200)}
                     alt={m.original_name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 </div>
                 <div style={{ fontSize: 11, padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
@@ -956,7 +961,7 @@ export default function MobileCollageEditor() {
       </Popup>
 
       {/* 图层面板 */}
-      <Popup visible={showLayersSheet} onClose={() => setShowLayersSheet(false)} position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showLayersSheet} onClose={() => setShowLayersSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>图层 ({elements.length})</h3>
           {elements.length === 0 ? (

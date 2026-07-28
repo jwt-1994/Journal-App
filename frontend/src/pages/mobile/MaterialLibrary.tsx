@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog, Checkbox } from 'antd-mobile';
-import { DeleteOutline } from 'antd-mobile-icons';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog } from 'antd-mobile';
+import { DeleteOutline, CheckCircleFill, CircleOutline } from 'antd-mobile-icons';
 import {
   getCategories,
   getMaterials,
@@ -285,10 +285,21 @@ export default function MobileMaterialLibrary() {
                         }
                       }}
                     >
-                      {/* 多选勾选框（纯视觉，点击穿透到父元素） */}
+                      {/* 多选勾选框（纯CSS图标，无事件拦截） */}
                       {selectMode && (
-                        <div style={{ position: 'absolute', top: 2, right: 2, zIndex: 10, pointerEvents: 'none' }}>
-                          <Checkbox checked={isSelected} />
+                        <div style={{
+                          position: 'absolute', top: 4, right: 4, zIndex: 10,
+                          width: 22, height: 22, borderRadius: '50%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: isSelected ? '#1677ff' : 'rgba(255,255,255,0.85)',
+                          border: isSelected ? 'none' : '2px solid #ccc',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                        }}>
+                          {isSelected ? (
+                            <CheckCircleFill style={{ color: '#fff', fontSize: 22 }} />
+                          ) : (
+                            <CircleOutline style={{ color: '#ccc', fontSize: 22 }} />
+                          )}
                         </div>
                       )}
                       <div
