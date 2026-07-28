@@ -629,6 +629,7 @@ export default function MobileCollageEditor() {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden',
+        boxSizing: 'border-box',
         background: '#f5f5f5',
         paddingTop: 'env(safe-area-inset-top, 0)',
         paddingBottom: 'env(safe-area-inset-bottom, 0)',

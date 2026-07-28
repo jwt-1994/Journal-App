@@ -312,7 +312,7 @@ export default function MobileMaterialLibrary() {
       </div>
 
       {/* 多选底部操作栏 */}
-      {selectMode && selectedIds.size > 0 && (
+      {selectMode && (
         <div style={{
           padding: '8px 16px',
           paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0))',
@@ -323,10 +323,16 @@ export default function MobileMaterialLibrary() {
           justifyContent: 'space-between',
           flexShrink: 0,
         }}>
-          <span style={{ fontSize: 14, color: '#333' }}>已选 {selectedIds.size} 个</span>
-          <Button color="danger" size="small" loading={deleting} onClick={handleBatchDelete}>
-            <DeleteOutline /> 删除
-          </Button>
+          {selectedIds.size > 0 ? (
+            <>
+              <span style={{ fontSize: 14, color: '#333' }}>已选 {selectedIds.size} 个</span>
+              <Button color="danger" size="small" loading={deleting} onClick={handleBatchDelete}>
+                <DeleteOutline /> 删除
+              </Button>
+            </>
+          ) : (
+            <span style={{ fontSize: 14, color: '#999' }}>请点击素材进行勾选</span>
+          )}
         </div>
       )}
 
