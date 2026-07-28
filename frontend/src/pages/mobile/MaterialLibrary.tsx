@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, ActionSheet, Dialog } from 'antd-mobile';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog, Checkbox } from 'antd-mobile';
+import { DeleteOutline } from 'antd-mobile-icons';
 import {
   getCategories,
   getMaterials,
@@ -54,10 +55,12 @@ export default function MobileMaterialLibrary() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const previewKeyRef = useRef(0);
 
-  // 长按删除
-  const [longPressTarget, setLongPressTarget] = useState<Material | null>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 多选模式
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   // 防竞态
   const fetchIdRef = useRef(0);
@@ -107,6 +110,8 @@ export default function MobileMaterialLibrary() {
     setPage(1);
     setMaterials([]);
     setHasMore(true);
+    setSelectedIds(new Set());
+    setSelectMode(false);
     if (activeTab !== 'backgrounds') {
       setLoading(true);
       fetchMaterials(1, true);
@@ -121,42 +126,48 @@ export default function MobileMaterialLibrary() {
     await fetchMaterials(nextPage, false);
   };
 
-  const handleImageClick = (_src: string, allImages: string[], index: number) => {
+  const handleImageClick = (allImages: string[], index: number) => {
+    if (selectMode) return; // 多选模式下不预览
+    previewKeyRef.current += 1;
     setPreviewImages(allImages);
     setPreviewIndex(index);
     setPreviewVisible(true);
   };
 
-  // 长按：弹出 ActionSheet
-  const handleTouchStart = (m: Material) => {
-    longPressTimerRef.current = setTimeout(() => {
-      setLongPressTarget(m);
-    }, 600);
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const handleTouchEnd = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
-  const handleDelete = () => {
-    if (!longPressTarget) return;
-    const id = longPressTarget.id;
-    setLongPressTarget(null);
+  const handleBatchDelete = () => {
+    if (selectedIds.size === 0) return;
     Dialog.confirm({
-      title: '确定删除此素材？',
-      content: '删除后不可恢复',
+      title: '确定删除？',
+      content: `将删除 ${selectedIds.size} 个素材，不可恢复`,
       confirmText: '删除',
       cancelText: '取消',
       onConfirm: async () => {
-        try {
-          await deleteMaterial(id);
-          setMaterials(prev => prev.filter(m => m.id !== id));
-          Toast.show({ content: '已删除', icon: 'success' });
-        } catch {
-          Toast.show({ content: '删除失败', icon: 'fail' });
+        setDeleting(true);
+        let success = 0;
+        let fail = 0;
+        for (const id of selectedIds) {
+          try {
+            await deleteMaterial(id);
+            success++;
+          } catch { fail++; }
+        }
+        setMaterials(prev => prev.filter(m => !selectedIds.has(m.id)));
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        setDeleting(false);
+        if (fail > 0) {
+          Toast.show({ content: `已删除 ${success} 个，${fail} 个失败`, icon: 'fail' });
+        } else {
+          Toast.show({ content: `已删除 ${success} 个素材`, icon: 'success' });
         }
       },
     });
@@ -188,16 +199,32 @@ export default function MobileMaterialLibrary() {
         />
       </div>
 
-      <div style={{ background: '#fff', borderBottom: '1px solid #f5f5f5' }}>
-        <Tabs
-          activeKey={activeTab}
-          onChange={key => setActiveTab(key)}
-          style={{ '--title-font-size': '13px' }}
-        >
-          {tabItems.map(tab => (
-            <Tabs.Tab key={tab.key} title={tab.title} />
-          ))}
-        </Tabs>
+      <div style={{ background: '#fff', borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center' }}>
+        <div style={{ flex: 1 }}>
+          <Tabs
+            activeKey={activeTab}
+            onChange={key => setActiveTab(key)}
+            style={{ '--title-font-size': '13px' }}
+          >
+            {tabItems.map(tab => (
+              <Tabs.Tab key={tab.key} title={tab.title} />
+            ))}
+          </Tabs>
+        </div>
+        {activeTab !== 'backgrounds' && (
+          <Button
+            size="small"
+            fill={selectMode ? 'solid' : 'none'}
+            color={selectMode ? 'danger' : 'primary'}
+            onClick={() => {
+              setSelectMode(!selectMode);
+              setSelectedIds(new Set());
+            }}
+            style={{ marginRight: 8, flexShrink: 0 }}
+          >
+            {selectMode ? '取消' : '选择'}
+          </Button>
+        )}
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '4px' }}>
@@ -209,7 +236,7 @@ export default function MobileMaterialLibrary() {
               backgrounds.map(bg => (
                 <div
                   key={bg.id}
-                  onClick={() => handleImageClick(getBackgroundFileUrl(bg.id), backgrounds.map(b => getBackgroundFileUrl(b.id)), backgrounds.indexOf(bg))}
+                  onClick={() => handleImageClick(backgrounds.map(b => getBackgroundFileUrl(b.id)), backgrounds.indexOf(bg))}
                   style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden', background: '#fff' }}
                 >
                   <div style={{ width: '100%', aspectRatio: '1', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
@@ -232,45 +259,51 @@ export default function MobileMaterialLibrary() {
               <ErrorBlock status="empty" title="暂无素材" description="去上传页面上传素材吧" style={{ padding: '48px 0' }} />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
-                {materials.map((m, idx) => (
-                  <div
-                    key={m.id}
-                    style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden', background: '#fff' }}
-                    onTouchStart={() => handleTouchStart(m)}
-                    onTouchEnd={handleTouchEnd}
-                    onTouchMove={handleTouchEnd}
-                    onMouseDown={() => handleTouchStart(m)}
-                    onMouseUp={handleTouchEnd}
-                    onMouseLeave={handleTouchEnd}
-                    onClick={() => {
-                      // 如果刚触发了长按，不响应点击
-                      if (longPressTimerRef.current) {
-                        clearTimeout(longPressTimerRef.current);
-                        longPressTimerRef.current = null;
-                      }
-                      handleImageClick(getImageSrc(m), materials.map(x => getImageSrc(x)), idx);
-                    }}
-                  >
+                {materials.map((m, idx) => {
+                  const isSelected = selectedIds.has(m.id);
+                  return (
                     <div
+                      key={m.id}
                       style={{
-                        width: '100%',
-                        aspectRatio: '1',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 8px 8px',
+                        position: 'relative',
+                        border: isSelected ? '2px solid #1677ff' : '1px solid #f0f0f0',
+                        borderRadius: 6, overflow: 'hidden', background: '#fff',
+                      }}
+                      onClick={() => {
+                        if (selectMode) {
+                          toggleSelect(m.id);
+                        } else {
+                          handleImageClick(materials.map(x => getImageSrc(x)), idx);
+                        }
                       }}
                     >
-                      <img
-                        src={getThumbSrc(m)}
-                        alt={m.original_name}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                        loading="lazy"
-                      />
+                      {/* 多选勾选框 */}
+                      {selectMode && (
+                        <div style={{ position: 'absolute', top: 2, right: 2, zIndex: 10 }}>
+                          <Checkbox checked={isSelected} />
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 8px 8px',
+                        }}
+                      >
+                        <img
+                          src={getThumbSrc(m)}
+                          alt={m.original_name}
+                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                          loading="lazy"
+                        />
+                      </div>
+                      <div style={{ padding: '2px 4px', fontSize: 10, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
                     </div>
-                    <div style={{ padding: '2px 4px', fontSize: 10, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <InfiniteScroll loadMore={loadMore} hasMore={hasMore} />
@@ -278,15 +311,27 @@ export default function MobileMaterialLibrary() {
         )}
       </div>
 
-      {/* 长按删除 ActionSheet */}
-      <ActionSheet
-        visible={!!longPressTarget}
-        actions={[{ key: 'delete', text: '删除', danger: true, onClick: handleDelete }]}
-        onClose={() => setLongPressTarget(null)}
-        cancelText="取消"
-      />
+      {/* 多选底部操作栏 */}
+      {selectMode && selectedIds.size > 0 && (
+        <div style={{
+          padding: '8px 16px',
+          paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0))',
+          background: '#fff',
+          borderTop: '1px solid #f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 14, color: '#333' }}>已选 {selectedIds.size} 个</span>
+          <Button color="danger" size="small" loading={deleting} onClick={handleBatchDelete}>
+            <DeleteOutline /> 删除
+          </Button>
+        </div>
+      )}
 
       <ImageViewer.Multi
+        key={previewKeyRef.current}
         images={previewImages}
         visible={previewVisible}
         defaultIndex={previewIndex}

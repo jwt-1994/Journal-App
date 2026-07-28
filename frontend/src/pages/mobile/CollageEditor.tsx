@@ -647,7 +647,7 @@ export default function MobileCollageEditor() {
         {setupStep === 1 && (
           <>
             <h2 style={{ textAlign: 'center', margin: '0 0 12px', flexShrink: 0 }}>选择画布尺寸</h2>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px', minHeight: 0 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {CANVAS_PRESETS.map(p => (
                   <div key={p.key}
@@ -679,7 +679,7 @@ export default function MobileCollageEditor() {
         {setupStep === 2 && (
           <>
             <h2 style={{ textAlign: 'center', margin: '0 0 12px', flexShrink: 0 }}>选择背景</h2>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px', minHeight: 0 }}>
               {renderBgCards()}
             </div>
             <div style={{ padding: '12px 16px', flexShrink: 0 }}>
