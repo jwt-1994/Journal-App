@@ -799,7 +799,7 @@ export default function MobileCollageEditor() {
       )}
 
       {/* 缩放指示 + 重置按钮 */}
-      <div style={{ position: 'fixed', top: 16, right: 16, display: 'flex', gap: 8, zIndex: 50 }}>
+      <div style={{ position: 'fixed', top: 50, right: 16, display: 'flex', gap: 8, zIndex: 50 }}>
         <Button size="mini" fill="none" style={{ background: 'rgba(0,0,0,0.5)', color: '#fff', borderRadius: 12, fontSize: 12 }}
           onClick={() => resetView()}>
           {Math.round(scale * 100)}%
@@ -839,8 +839,8 @@ export default function MobileCollageEditor() {
         </div>
       )}
 
-      {/* 快捷操作按钮 */}
-      <div style={{ position: 'fixed', top: 16, left: 16, display: 'flex', gap: 8, zIndex: 50 }}>
+      {/* 快捷操作按钮 — 避开 iOS 状态栏（safe-area + 状态栏约 50px） */}
+      <div style={{ position: 'fixed', top: 50, left: 16, display: 'flex', gap: 8, zIndex: 50, flexWrap: 'wrap' }}>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
           onClick={() => navigate(-1)}><LeftOutlined /> 返回</Button>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
@@ -954,7 +954,7 @@ export default function MobileCollageEditor() {
       </Popup>
 
       {/* 背景选择 */}
-      <Popup visible={showBgSheet} onClose={() => setShowBgSheet(false)} position="bottom" bodyStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showBgSheet} onClose={() => setShowBgSheet(false)} position="bottom" bodyStyle={{ maxHeight: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>选择背景</h3>
           {renderBgCards()}

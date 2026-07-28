@@ -26,7 +26,7 @@ const baseURL = isCapacitorNative()
 
 const api = axios.create({
   baseURL,
-  timeout: 30000,
+  timeout: 15000,
 });
 
 // 请求拦截器：离线时使用缓存

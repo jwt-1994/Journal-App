@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast } from 'antd-mobile';
+import { useState, useEffect, useRef } from 'react';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, SwipeAction, Dialog } from 'antd-mobile';
 import {
   getCategories,
   getMaterials,
@@ -7,6 +7,7 @@ import {
   getMaterialFileUrl,
   getRemovedFileUrl,
   getBackgroundFileUrl,
+  deleteMaterial,
 } from '../../services/api';
 
 interface Material {
@@ -33,7 +34,7 @@ interface Background {
   height: number;
 }
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 20;
 
 export default function MobileMaterialLibrary() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -53,16 +54,23 @@ export default function MobileMaterialLibrary() {
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
 
+  // 防竞态：用 ref 追踪最新的请求序号
+  const fetchIdRef = useRef(0);
+
+  // 加载分类和背景
   useEffect(() => {
     Promise.all([getCategories(), getBackgrounds()]).then(([catRes, bgRes]) => {
-      setCategories(catRes.data);
-      setBackgrounds(bgRes.data);
+      setCategories(Array.isArray(catRes.data) ? catRes.data : []);
+      setBackgrounds(Array.isArray(bgRes.data) ? bgRes.data : []);
     }).catch(() => {
       Toast.show({ content: '加载分类/背景失败，请检查网络', icon: 'fail' });
     });
   }, []);
 
-  const fetchMaterials = useCallback(async (pageNum: number, reset: boolean) => {
+  // 加载素材（稳定引用，不依赖 activeTab/searchText 的 useCallback）
+  const fetchMaterials = async (pageNum: number, reset: boolean) => {
+    const currentFetchId = ++fetchIdRef.current;
+
     if (reset) setLoading(true);
     try {
       const params: Record<string, unknown> = {
@@ -77,7 +85,11 @@ export default function MobileMaterialLibrary() {
         params.category_id = Number(activeTab);
       }
       const res = await getMaterials(params as never);
-      const items = res.data.items;
+
+      // 防竞态：只有最新请求的结果才更新状态
+      if (currentFetchId !== fetchIdRef.current) return;
+
+      const items = res.data.items || [];
       if (reset) {
         setMaterials(items);
       } else {
@@ -85,20 +97,30 @@ export default function MobileMaterialLibrary() {
       }
       setHasMore(items.length >= PAGE_SIZE);
     } catch {
-      if (reset) Toast.show({ content: '加载素材失败，请检查网络', icon: 'fail' });
+      if (currentFetchId !== fetchIdRef.current) return;
+      if (reset) {
+        setMaterials([]);
+        Toast.show({ content: '加载素材失败，请检查网络', icon: 'fail' });
+      }
     } finally {
-      setLoading(false);
+      if (currentFetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [activeTab, searchText, sortBy, sortOrder]);
+  };
 
+  // tab 或搜索变化时重新加载
   useEffect(() => {
     setPage(1);
     setMaterials([]);
     setHasMore(true);
     if (activeTab !== 'backgrounds') {
+      setLoading(true);
       fetchMaterials(1, true);
+    } else {
+      setLoading(false);
     }
-  }, [fetchMaterials, activeTab]);
+  }, [activeTab, searchText]);
 
   const loadMore = async () => {
     const nextPage = page + 1;
@@ -110,6 +132,22 @@ export default function MobileMaterialLibrary() {
     setPreviewImages(allImages);
     setPreviewIndex(index);
     setPreviewVisible(true);
+  };
+
+  const handleDelete = (id: number) => {
+    Dialog.confirm({
+      title: '确定删除此素材？',
+      content: '删除后不可恢复',
+      onConfirm: async () => {
+        try {
+          await deleteMaterial(id);
+          setMaterials(prev => prev.filter(m => m.id !== id));
+          Toast.show({ content: '已删除', icon: 'success' });
+        } catch {
+          Toast.show({ content: '删除失败', icon: 'fail' });
+        }
+      },
+    });
   };
 
   const getImageSrc = (m: Material) => {
@@ -139,7 +177,7 @@ export default function MobileMaterialLibrary() {
       <div style={{ background: '#fff', borderBottom: '1px solid #f5f5f5' }}>
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={key => setActiveTab(key)}
           style={{ '--title-font-size': '13px' }}
         >
           {tabItems.map(tab => (
@@ -154,7 +192,7 @@ export default function MobileMaterialLibrary() {
         {activeTab === 'backgrounds' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             {backgrounds.length === 0 ? (
-              <ErrorBlock status="empty" title="暂无背景素材" style={{ gridColumn: '1 / -1', padding: '48px 0' }} />
+              <ErrorBlock status="empty" title="暂无背景素材" description="请先在设置中上传背景" style={{ gridColumn: '1 / -1', padding: '48px 0' }} />
             ) : (
               backgrounds.map(bg => (
                 <div
@@ -168,7 +206,7 @@ export default function MobileMaterialLibrary() {
                   }}
                 >
                   <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
-                    <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   </div>
                   <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
                 </div>
@@ -184,40 +222,51 @@ export default function MobileMaterialLibrary() {
               <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
                 <SpinLoading color="primary" />
               </div>
-            ) : materials.length === 0 ? (
-              <ErrorBlock status="empty" title="暂无素材" style={{ padding: '48px 0' }} />
+            ) : materials.length === 0 && !loading ? (
+              <ErrorBlock status="empty" title="暂无素材" description="去上传页面上传素材吧" style={{ padding: '48px 0' }} />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {materials.map((m, idx) => (
-                  <div
+                  <SwipeAction
                     key={m.id}
-                    onClick={() => handleImageClick(getImageSrc(m), materials.map(x => getImageSrc(x)), idx)}
-                    style={{
-                      border: '1px solid #f0f0f0',
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      background: '#fff',
-                    }}
+                    rightActions={[
+                      {
+                        key: 'delete',
+                        text: '删除',
+                        color: 'danger',
+                        onClick: () => handleDelete(m.id),
+                      },
+                    ]}
                   >
                     <div
+                      onClick={() => handleImageClick(getImageSrc(m), materials.map(x => getImageSrc(x)), idx)}
                       style={{
-                        width: '100%',
-                        aspectRatio: '1',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px',
+                        border: '1px solid #f0f0f0',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        background: '#fff',
                       }}
                     >
-                      <img
-                        src={getImageSrc(m)}
-                        alt={m.original_name}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                        loading="lazy"
-                      />
+                      <div
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px',
+                        }}
+                      >
+                        <img
+                          src={getImageSrc(m)}
+                          alt={m.original_name}
+                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                          loading="lazy"
+                        />
+                      </div>
+                      <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
                     </div>
-                    <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
-                  </div>
+                  </SwipeAction>
                 ))}
               </div>
             )}
