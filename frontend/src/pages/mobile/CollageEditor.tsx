@@ -627,8 +627,14 @@ export default function MobileCollageEditor() {
   // --- 画布设置界面（分步） ---
   if (showCanvasSetup) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', padding: 16, background: '#f5f5f5' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden',
+        background: '#f5f5f5',
+        paddingTop: 'env(safe-area-inset-top, 0)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0)',
+      }}>
+        {/* 顶部：返回/上一步 */}
+        <div style={{ padding: '12px 16px 8px', flexShrink: 0 }}>
           <Button size="small" fill="none" onClick={() => {
             if (setupStep === 1) navigate(-1);
             else setSetupStep(1);
@@ -640,8 +646,8 @@ export default function MobileCollageEditor() {
         {/* Step 1：选择画布尺寸 */}
         {setupStep === 1 && (
           <>
-            <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>选择画布尺寸</h2>
-            <div style={{ flex: 1 }}>
+            <h2 style={{ textAlign: 'center', margin: '0 0 12px', flexShrink: 0 }}>选择画布尺寸</h2>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {CANVAS_PRESETS.map(p => (
                   <div key={p.key}
@@ -661,22 +667,26 @@ export default function MobileCollageEditor() {
                 ))}
               </div>
             </div>
-            <Button block color="primary" size="large" onClick={() => setSetupStep(2)} style={{ marginTop: 16 }}>
-              下一步：选择背景
-            </Button>
+            <div style={{ padding: '12px 16px', flexShrink: 0 }}>
+              <Button block color="primary" size="large" onClick={() => setSetupStep(2)}>
+                下一步：选择背景
+              </Button>
+            </div>
           </>
         )}
 
         {/* Step 2：选择背景 */}
         {setupStep === 2 && (
           <>
-            <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>选择背景</h2>
-            <div style={{ flex: 1 }}>
+            <h2 style={{ textAlign: 'center', margin: '0 0 12px', flexShrink: 0 }}>选择背景</h2>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
               {renderBgCards()}
             </div>
-            <Button block color="primary" size="large" onClick={handleCreateCanvas} style={{ marginTop: 16 }}>
-              确认，开始拼贴
-            </Button>
+            <div style={{ padding: '12px 16px', flexShrink: 0 }}>
+              <Button block color="primary" size="large" onClick={handleCreateCanvas}>
+                确认，开始拼贴
+              </Button>
+            </div>
           </>
         )}
       </div>

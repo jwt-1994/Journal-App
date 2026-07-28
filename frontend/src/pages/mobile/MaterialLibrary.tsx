@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, SwipeAction, Dialog } from 'antd-mobile';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, ActionSheet, Dialog } from 'antd-mobile';
 import {
   getCategories,
   getMaterials,
@@ -55,10 +55,13 @@ export default function MobileMaterialLibrary() {
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
 
-  // 防竞态：用 ref 追踪最新的请求序号
+  // 长按删除
+  const [longPressTarget, setLongPressTarget] = useState<Material | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 防竞态
   const fetchIdRef = useRef(0);
 
-  // 加载分类和背景
   useEffect(() => {
     Promise.all([getCategories(), getBackgrounds()]).then(([catRes, bgRes]) => {
       setCategories(Array.isArray(catRes.data) ? catRes.data : []);
@@ -68,10 +71,8 @@ export default function MobileMaterialLibrary() {
     });
   }, []);
 
-  // 加载素材（稳定引用，不依赖 activeTab/searchText 的 useCallback）
   const fetchMaterials = async (pageNum: number, reset: boolean) => {
     const currentFetchId = ++fetchIdRef.current;
-
     if (reset) setLoading(true);
     try {
       const params: Record<string, unknown> = {
@@ -86,16 +87,10 @@ export default function MobileMaterialLibrary() {
         params.category_id = Number(activeTab);
       }
       const res = await getMaterials(params as never);
-
-      // 防竞态：只有最新请求的结果才更新状态
       if (currentFetchId !== fetchIdRef.current) return;
-
       const items = res.data.items || [];
-      if (reset) {
-        setMaterials(items);
-      } else {
-        setMaterials(prev => [...prev, ...items]);
-      }
+      if (reset) setMaterials(items);
+      else setMaterials(prev => [...prev, ...items]);
       setHasMore(items.length >= PAGE_SIZE);
     } catch {
       if (currentFetchId !== fetchIdRef.current) return;
@@ -104,13 +99,10 @@ export default function MobileMaterialLibrary() {
         Toast.show({ content: '加载素材失败，请检查网络', icon: 'fail' });
       }
     } finally {
-      if (currentFetchId === fetchIdRef.current) {
-        setLoading(false);
-      }
+      if (currentFetchId === fetchIdRef.current) setLoading(false);
     }
   };
 
-  // tab 或搜索变化时重新加载
   useEffect(() => {
     setPage(1);
     setMaterials([]);
@@ -135,7 +127,24 @@ export default function MobileMaterialLibrary() {
     setPreviewVisible(true);
   };
 
-  const handleDelete = (id: number) => {
+  // 长按：弹出 ActionSheet
+  const handleTouchStart = (m: Material) => {
+    longPressTimerRef.current = setTimeout(() => {
+      setLongPressTarget(m);
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleDelete = () => {
+    if (!longPressTarget) return;
+    const id = longPressTarget.id;
+    setLongPressTarget(null);
     Dialog.confirm({
       title: '确定删除此素材？',
       content: '删除后不可恢复',
@@ -158,7 +167,7 @@ export default function MobileMaterialLibrary() {
   };
 
   const getThumbSrc = (m: Material) => {
-    return m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialThumbUrl(m.id, 200);
+    return m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialThumbUrl(m.id, 120);
   };
 
   const tabItems = [
@@ -169,7 +178,6 @@ export default function MobileMaterialLibrary() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* 搜索栏 */}
       <div style={{ padding: '8px 12px', background: '#fff' }}>
         <SearchBar
           placeholder="搜索素材..."
@@ -180,7 +188,6 @@ export default function MobileMaterialLibrary() {
         />
       </div>
 
-      {/* 分类标签 */}
       <div style={{ background: '#fff', borderBottom: '1px solid #f5f5f5' }}>
         <Tabs
           activeKey={activeTab}
@@ -193,11 +200,9 @@ export default function MobileMaterialLibrary() {
         </Tabs>
       </div>
 
-      {/* 内容区域 */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
-        {/* 背景 Tab */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '4px' }}>
         {activeTab === 'backgrounds' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
             {backgrounds.length === 0 ? (
               <ErrorBlock status="empty" title="暂无背景素材" description="请先在设置中上传背景" style={{ gridColumn: '1 / -1', padding: '48px 0' }} />
             ) : (
@@ -205,24 +210,18 @@ export default function MobileMaterialLibrary() {
                 <div
                   key={bg.id}
                   onClick={() => handleImageClick(getBackgroundFileUrl(bg.id), backgrounds.map(b => getBackgroundFileUrl(b.id)), backgrounds.indexOf(bg))}
-                  style={{
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    background: '#fff',
-                  }}
+                  style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden', background: '#fff' }}
                 >
-                  <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
+                  <div style={{ width: '100%', aspectRatio: '1', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
                     <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                   </div>
-                  <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
+                  <div style={{ padding: '2px 4px', fontSize: 10, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
                 </div>
               ))
             )}
           </div>
         )}
 
-        {/* 素材 Tab */}
         {activeTab !== 'backgrounds' && (
           <>
             {loading && materials.length === 0 ? (
@@ -232,48 +231,45 @@ export default function MobileMaterialLibrary() {
             ) : materials.length === 0 && !loading ? (
               <ErrorBlock status="empty" title="暂无素材" description="去上传页面上传素材吧" style={{ padding: '48px 0' }} />
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
                 {materials.map((m, idx) => (
-                  <SwipeAction
+                  <div
                     key={m.id}
-                    rightActions={[
-                      {
-                        key: 'delete',
-                        text: '删除',
-                        color: 'danger',
-                        onClick: () => handleDelete(m.id),
-                      },
-                    ]}
+                    style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden', background: '#fff' }}
+                    onTouchStart={() => handleTouchStart(m)}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchMove={handleTouchEnd}
+                    onMouseDown={() => handleTouchStart(m)}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                    onClick={() => {
+                      // 如果刚触发了长按，不响应点击
+                      if (longPressTimerRef.current) {
+                        clearTimeout(longPressTimerRef.current);
+                        longPressTimerRef.current = null;
+                      }
+                      handleImageClick(getImageSrc(m), materials.map(x => getImageSrc(x)), idx);
+                    }}
                   >
                     <div
-                      onClick={() => handleImageClick(getImageSrc(m), materials.map(x => getImageSrc(x)), idx)}
                       style={{
-                        border: '1px solid #f0f0f0',
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        background: '#fff',
+                        width: '100%',
+                        aspectRatio: '1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 8px 8px',
                       }}
                     >
-                      <div
-                        style={{
-                          width: '100%',
-                          aspectRatio: '1',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px',
-                        }}
-                      >
-                        <img
-                          src={getThumbSrc(m)}
-                          alt={m.original_name}
-                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                          loading="lazy"
-                        />
-                      </div>
-                      <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
+                      <img
+                        src={getThumbSrc(m)}
+                        alt={m.original_name}
+                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                        loading="lazy"
+                      />
                     </div>
-                  </SwipeAction>
+                    <div style={{ padding: '2px 4px', fontSize: 10, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
+                  </div>
                 ))}
               </div>
             )}
@@ -282,7 +278,14 @@ export default function MobileMaterialLibrary() {
         )}
       </div>
 
-      {/* 图片预览 */}
+      {/* 长按删除 ActionSheet */}
+      <ActionSheet
+        visible={!!longPressTarget}
+        actions={[{ key: 'delete', text: '删除', danger: true, onClick: handleDelete }]}
+        onClose={() => setLongPressTarget(null)}
+        cancelText="取消"
+      />
+
       <ImageViewer.Multi
         images={previewImages}
         visible={previewVisible}
