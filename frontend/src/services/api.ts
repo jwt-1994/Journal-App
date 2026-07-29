@@ -2,7 +2,7 @@
 // 所有数据存储在手机本地，仅上传素材时调用抠图服务
 
 import { db, initPresets } from './localDB';
-import type { CategoryDoc, MaterialDoc, BackgroundDoc, CollageDoc } from './localDB';
+import type { CollageDoc } from './localDB';
 import { saveFile, readFileAsBlob, readFileAsDataUrl, deleteFile } from './localFS';
 import { generateThumbnail } from './localThumbnail';
 import { renderColorBg, renderTextureBg } from './localPresets';

@@ -124,7 +124,6 @@ export default function MobileMaterialLibrary() {
       const res = await getMaterials(params as never);
       if (currentFetchId !== fetchIdRef.current) return;
       const items = res.data.items || [];
-      const newItems = reset ? items : [...materials, ...items];
       if (reset) setMaterials(items);
       else setMaterials(prev => [...prev, ...items]);
       loadMaterialUrls(items);
