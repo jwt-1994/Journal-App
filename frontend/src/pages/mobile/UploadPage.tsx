@@ -85,8 +85,9 @@ export default function MobileUploadPage() {
           : images[i].file;
         await uploadMaterial(fileToUpload, selectedCategory, autoRemoveBg, materialName);
         success++;
-      } catch {
+      } catch (e: any) {
         failed++;
+        Toast.show({ content: e?.message || '上传失败', icon: 'fail' });
       }
       setProgress(Math.round(((i + 1) / images.length) * 100));
     }

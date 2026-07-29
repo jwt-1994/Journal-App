@@ -9,12 +9,12 @@ import { renderColorBg, renderTextureBg } from './localPresets';
 import { removeBackground } from './removeBgService';
 
 // ---- 初始化 ----
-let initialized = false;
+let initPromise: Promise<void> | null = null;
 async function ensureInit() {
-  if (!initialized) {
-    await initPresets();
-    initialized = true;
+  if (!initPromise) {
+    initPromise = initPresets();
   }
+  await initPromise;
 }
 
 // ---- 分类 ----
