@@ -22,7 +22,6 @@ import {
   getMaterials,
   getBackgrounds,
   getBackgroundFileUrl,
-  getMaterialFileUrl,
   getMaterialThumbUrl,
   getRemovedFileUrl,
   loadMaterialImage,
@@ -582,7 +581,7 @@ export default function MobileCollageEditor() {
             const blobUrl = await loadMaterialImage(m.id, m.has_removed_bg === 'done');
             const img = new window.Image();
             img.src = blobUrl;
-            await new Promise<void>((resolve, reject) => {
+            await new Promise<void>((resolve) => {
               img.onload = () => { newEls.push({ ...l, img, material_id: m.id }); URL.revokeObjectURL(blobUrl); resolve(); };
               img.onerror = () => { newEls.push(l); resolve(); };
             });

@@ -22,7 +22,10 @@ export async function getCategories() {
   await ensureInit();
   const cats = await db.categories.toArray();
   const enriched = await Promise.all(cats.map(async c => ({
-    ...c,
+    id: c.id!,
+    name: c.name,
+    is_preset: c.is_preset,
+    created_at: c.created_at,
     material_count: await db.materials.where('category_id').equals(c.id!).count(),
   })));
   return { data: enriched };

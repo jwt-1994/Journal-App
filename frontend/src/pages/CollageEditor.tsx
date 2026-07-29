@@ -659,7 +659,7 @@ export default function CollageEditor() {
       setCanvasH(d.canvas_height || DEFAULT_CANVAS_H);
       setShowCanvasSetup(false);
 
-      const layout = d.layout_data || [];
+      const layout = (d.layout_data || []) as any[];
       const newEls: CanvasElement[] = [];
       let loaded = 0;
       const total = layout.filter((l: any) => l.type === 'image').length;
