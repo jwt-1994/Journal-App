@@ -20,13 +20,16 @@ export async function removeBackground(file: Blob | File): Promise<Blob> {
 
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '未知错误');
-      throw new Error(`抠图失败: ${errText}`);
+      throw new Error(`抠图服务返回错误: ${errText}`);
     }
 
     return resp.blob();
   } catch (e: any) {
     if (e.name === 'AbortError') {
-      throw new Error('抠图服务超时，请确保电脑后端已启动并与手机在同一网络');
+      throw new Error('抠图服务超时（15秒），请确保电脑后端已启动并与手机在同一网络');
+    }
+    if (e.message?.includes('Failed to fetch') || e.message?.includes('NetworkError') || e.name === 'TypeError') {
+      throw new Error(`无法连接抠图服务 (${REMBG_URL})，请确保电脑后端已启动并与手机在同一WiFi`);
     }
     throw e;
   } finally {

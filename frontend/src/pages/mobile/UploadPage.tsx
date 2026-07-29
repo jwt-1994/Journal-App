@@ -50,6 +50,7 @@ export default function MobileUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const fileMap = useRef<Map<string, File>>(new Map());
+  const firstErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
     setCategoriesLoading(true);
@@ -76,6 +77,7 @@ export default function MobileUploadPage() {
 
     let success = 0;
     let failed = 0;
+    firstErrorRef.current = null;
 
     for (let i = 0; i < images.length; i++) {
       try {
@@ -87,19 +89,23 @@ export default function MobileUploadPage() {
         success++;
       } catch (e: any) {
         failed++;
-        Toast.show({ content: e?.message || '上传失败', icon: 'fail' });
+        const msg = e?.message || '上传失败';
+        if (!firstErrorRef.current) firstErrorRef.current = msg;
+        Toast.show({ content: msg, icon: 'fail' });
       }
       setProgress(Math.round(((i + 1) / images.length) * 100));
     }
 
     setUploading(false);
-    if (failed === 0) {
-      Toast.show({ content: `上传成功 ${success} 张`, icon: 'success' });
+    if (success > 0) {
+      Toast.show({ content: `上传成功 ${success} 张` + (failed > 0 ? `，失败 ${failed} 张` : ''), icon: success > 0 ? 'success' : 'fail' });
+      setImages([]);
+      setMaterialName('');
+      fileMap.current.clear();
     } else {
-      Toast.show({ content: `成功 ${success} 张，失败 ${failed} 张`, icon: 'fail' });
+      // 全部失败，保留选中状态，不重置
+      Toast.show({ content: `上传失败：${firstErrorRef.current || '未知错误'}`, icon: 'fail', duration: 3000 });
     }
-    setImages([]);
-    setMaterialName('');
   };
 
   return (

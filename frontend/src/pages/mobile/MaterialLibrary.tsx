@@ -258,8 +258,7 @@ export default function MobileMaterialLibrary() {
             ))}
           </Tabs>
         </div>
-        {activeTab !== 'backgrounds' && (
-          selectMode ? (
+        {activeTab !== 'backgrounds' && selectMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
               <Button size="small" color="danger" loading={deleting}
                 disabled={selectedIds.size === 0}
@@ -270,14 +269,7 @@ export default function MobileMaterialLibrary() {
                 取消
               </Button>
             </div>
-          ) : (
-            <Button size="small" fill="none" color="primary"
-              onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}
-              style={{ flexShrink: 0, marginLeft: 8 }}>
-              选择
-            </Button>
-          )
-        )}
+          )}
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '4px' }}>
