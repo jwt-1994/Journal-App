@@ -1,78 +1,110 @@
-import axios from 'axios';
-import { isOnline } from './offlineStorage';
+// 本地数据层：IndexedDB + Capacitor Filesystem + 抠图微服务
+// 所有数据存储在手机本地，仅上传素材时调用抠图服务
 
-// 云端后端地址：手机连接电脑的局域网 IP
-// 如果电脑 IP 变了，在这里修改即可
-const CLOUD_API_URL = 'http://172.17.246.41:8000/api';
+import { db, initPresets } from './localDB';
+import type { CategoryDoc, MaterialDoc, BackgroundDoc, CollageDoc } from './localDB';
+import { saveFile, readFileAsBlob, readFileAsDataUrl, deleteFile } from './localFS';
+import { generateThumbnail } from './localThumbnail';
+import { renderColorBg, renderTextureBg } from './localPresets';
+import { removeBackground } from './removeBgService';
 
-// 检测运行环境
-const isCapacitorNative = (): boolean => {
-  try {
-    return !!(window as any).Capacitor?.isNativePlatform?.();
-  } catch {
-    return false;
+// ---- 初始化 ----
+let initialized = false;
+async function ensureInit() {
+  if (!initialized) {
+    await initPresets();
+    initialized = true;
   }
-};
+}
 
-// 环境判断：
-// - Capacitor 原生 iOS：使用云端 API
-// - Electron：使用本地 API
-// - 开发模式：使用 Vite 代理
-const baseURL = isCapacitorNative()
-  ? CLOUD_API_URL
-  : window.location.protocol === 'file:'
-    ? 'http://localhost:8000/api'
-    : '/api';
+// ---- 分类 ----
+export async function getCategories() {
+  await ensureInit();
+  const cats = await db.categories.toArray();
+  const enriched = await Promise.all(cats.map(async c => ({
+    ...c,
+    material_count: await db.materials.where('category_id').equals(c.id!).count(),
+  })));
+  return { data: enriched };
+}
 
-const api = axios.create({
-  baseURL,
-  timeout: 15000,
-});
+export async function createCategory(name: string) {
+  await ensureInit();
+  const existing = await db.categories.where('name').equals(name).first();
+  if (existing) throw new Error('该分类已存在');
+  const id = await db.categories.add({
+    name, is_preset: false,
+    created_at: new Date().toISOString(),
+  });
+  return { data: { id, name, is_preset: false } };
+}
 
-// 请求拦截器：离线时使用缓存
-api.interceptors.request.use(async (config) => {
-  if (!isOnline()) {
-    console.warn('[API] 离线模式，请求将失败');
-  }
-  return config;
-});
+export async function deleteCategory(id: number) {
+  const cat = await db.categories.get(id);
+  if (!cat) throw new Error('分类不存在');
+  if (cat.is_preset) throw new Error('预设分类不可删除');
+  const materials = await db.materials.where('category_id').equals(id).count();
+  if (materials > 0) throw new Error('该分类下还有素材');
+  await db.categories.delete(id);
+  return { data: { message: '删除成功' } };
+}
 
-// 响应拦截器：处理网络错误
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (!error.response && !isOnline()) {
-      console.warn('[API] 网络不可用');
+// ---- 素材 ----
+export async function uploadMaterial(
+  file: File,
+  categoryId: number,
+  autoRemoveBg = true,
+  name = '',
+) {
+  await ensureInit();
+
+  // 1. 抠图（如果启用）
+  let resultBlob: Blob;
+  if (autoRemoveBg) {
+    try {
+      resultBlob = await removeBackground(file);
+    } catch {
+      throw new Error('抠图服务不可用，请检查电脑上的抠图服务是否启动');
     }
-    return Promise.reject(error);
+  } else {
+    resultBlob = file;
   }
-);
 
-// 分类
-export const getCategories = () => api.get('/categories');
-export const createCategory = (name: string) => api.post('/categories', null, { params: { name } });
-export const deleteCategory = (id: number) => api.delete(`/categories/${id}`);
+  // 2. 保存到本地文件系统（只存抠图结果）
+  const { uri, filename } = await saveFile(resultBlob, 'materials', 'png');
 
-// 素材
-export const uploadMaterial = (file: File, categoryId: number, autoRemoveBg = true, name = '') => {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('category_id', String(categoryId));
-  formData.append('auto_remove_bg', String(autoRemoveBg));
-  if (name) formData.append('name', name);
-  return api.post('/materials/upload', formData);
-};
+  // 3. 写入 IndexedDB
+  const id = await db.materials.add({
+    filename,
+    original_name: name.trim() || file.name,
+    category_id: categoryId,
+    file_size: resultBlob.size,
+    file_uri: uri,
+    created_at: new Date().toISOString(),
+  });
 
-export const uploadMaterialsBatch = (files: File[], categoryId: number, autoRemoveBg = true, name = '') => {
-  const formData = new FormData();
-  files.forEach((f) => formData.append('files', f));
-  formData.append('category_id', String(categoryId));
-  formData.append('auto_remove_bg', String(autoRemoveBg));
-  if (name) formData.append('name', name);
-  return api.post('/materials/upload/batch', formData);
-};
+  return { data: { id, filename, original_name: name.trim() || file.name, category_id: categoryId } };
+}
 
-export const getMaterials = (params: {
+export async function uploadMaterialsBatch(
+  files: File[],
+  categoryId: number,
+  autoRemoveBg = true,
+  name = '',
+) {
+  const results: { success: boolean; id?: number; name: string; error?: string }[] = [];
+  for (const file of files) {
+    try {
+      const res = await uploadMaterial(file, categoryId, autoRemoveBg, name);
+      results.push({ success: true, id: res.data.id, name: name || file.name });
+    } catch (e: any) {
+      results.push({ success: false, name: file.name, error: e.message || '上传失败' });
+    }
+  }
+  return { data: { results } };
+}
+
+export async function getMaterials(params: {
   page?: number;
   page_size?: number;
   category_id?: number;
@@ -80,57 +112,279 @@ export const getMaterials = (params: {
   bg_status?: string;
   sort_by?: string;
   sort_order?: string;
-}) => api.get('/materials', { params });
+}) {
+  await ensureInit();
+  let collection = db.materials.orderBy('created_at');
 
-export const getMaterial = (id: number) => api.get(`/materials/${id}`);
-export const getMaterialFileUrl = (id: number) => `${baseURL}/materials/${id}/file`;
-export const getMaterialThumbUrl = (id: number, size = 200) => `${baseURL}/materials/${id}/file?thumb=${size}`;
-export const getRemovedFileUrl = (id: number) => `${baseURL}/materials/${id}/removed-file`;
+  // 排序
+  if (params.sort_order === 'asc') {
+    collection = db.materials.orderBy('created_at');
+  } else {
+    collection = db.materials.reverse();
+  }
 
-// 通过 axios 加载素材图片为 blob URL（解决 Capacitor WebView 跨域问题）
-export const loadMaterialImage = async (id: number, useRemovedBg: boolean): Promise<string> => {
-  const path = useRemovedBg ? `/materials/${id}/removed-file` : `/materials/${id}/file`;
-  const resp = await api.get(path, { responseType: 'blob' });
-  return URL.createObjectURL(resp.data);
-};
-export const getRemovalStatus = (id: number) => api.get(`/materials/${id}/removal-status`);
-export const retryRemoval = (id: number) => api.post(`/materials/${id}/retry-removal`);
-export const deleteMaterial = (id: number) => api.delete(`/materials/${id}`);
-export const batchRemoveBg = (ids: number[]) => api.post('/materials/batch-remove-bg', ids);
-export const batchDelete = (ids: number[]) => api.post('/materials/batch-delete', ids);
+  let items = await collection.toArray();
 
-// 报表
-export const getDashboardStats = () => api.get('/dashboard/stats');
-export const getDashboardRecent = (limit?: number) => api.get('/dashboard/recent', { params: { limit } });
-export const getUploadTrend = (days?: number) => api.get('/dashboard/upload-trend', { params: { days } });
+  // 分类筛选
+  if (params.category_id !== undefined) {
+    items = items.filter(m => m.category_id === params.category_id);
+  }
 
-// 背景
-export const getBackgrounds = (type?: string) => api.get('/backgrounds', { params: { type } });
-export const createBackground = (file: File) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  return api.post('/backgrounds', formData);
-};
-export const deleteBackground = (id: number) => api.delete(`/backgrounds/${id}`);
-export const getBackgroundFileUrl = (id: number) => `${baseURL}/backgrounds/${id}/file`;
+  // 搜索
+  if (params.search) {
+    const q = params.search.toLowerCase();
+    items = items.filter(m => m.original_name.toLowerCase().includes(q));
+  }
 
-// 拼贴方案
-export const getCollages = () => api.get('/collages');
-export const getCollage = (id: number) => api.get(`/collages/${id}`);
-export const createCollage = (data: {
+  // 关联分类名称
+  const categories = await db.categories.toArray();
+  const catMap = new Map(categories.map(c => [c.id!, c.name]));
+
+  const enriched = items.map(m => ({
+    id: m.id!,
+    filename: m.filename,
+    original_name: m.original_name,
+    category_id: m.category_id,
+    category_name: catMap.get(m.category_id) || '',
+    file_size: m.file_size,
+    file_path: m.file_uri, // 兼容旧字段
+    has_removed_bg: 'done', // 本地存储的都是抠图结果
+    removed_bg_path: m.file_uri,
+    created_at: m.created_at,
+  }));
+
+  // 分页
+  const page = params.page || 1;
+  const pageSize = params.page_size || 20;
+  const total = enriched.length;
+  const paged = enriched.slice((page - 1) * pageSize, page * pageSize);
+
+  return { data: { total, page, page_size: pageSize, items: paged } };
+}
+
+export async function getMaterial(id: number) {
+  await ensureInit();
+  const m = await db.materials.get(id);
+  if (!m) throw new Error('素材不存在');
+  const cat = await db.categories.get(m.category_id);
+  return {
+    data: {
+      id: m.id!,
+      filename: m.filename,
+      original_name: m.original_name,
+      category_id: m.category_id,
+      category_name: cat?.name || '',
+      file_size: m.file_size,
+      file_path: m.file_uri,
+      has_removed_bg: 'done',
+      removed_bg_path: m.file_uri,
+      created_at: m.created_at,
+    },
+  };
+}
+
+export async function getMaterialFileUrl(id: number): Promise<string> {
+  await ensureInit();
+  const m = await db.materials.get(id);
+  if (!m) return '';
+  return readFileAsDataUrl(m.file_uri);
+}
+
+export async function getMaterialThumbUrl(id: number, size = 200): Promise<string> {
+  await ensureInit();
+  const m = await db.materials.get(id);
+  if (!m) return '';
+  return generateThumbnail(m.file_uri, size);
+}
+
+export async function getRemovedFileUrl(id: number): Promise<string> {
+  return getMaterialFileUrl(id); // 本地存储的都是抠图结果
+}
+
+export async function loadMaterialImage(id: number, _useRemovedBg: boolean): Promise<string> {
+  await ensureInit();
+  const m = await db.materials.get(id);
+  if (!m) throw new Error('素材不存在');
+  const blob = await readFileAsBlob(m.file_uri);
+  return URL.createObjectURL(blob);
+}
+
+export async function deleteMaterial(id: number) {
+  const m = await db.materials.get(id);
+  if (!m) throw new Error('素材不存在');
+  await deleteFile(m.file_uri);
+  await db.materials.delete(id);
+  return { data: { message: '删除成功' } };
+}
+
+export async function batchDelete(ids: number[]) {
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      await deleteMaterial(id);
+      deleted++;
+    } catch { /* skip */ }
+  }
+  return { data: { deleted, total: ids.length } };
+}
+
+// 以下两个函数为兼容旧接口，本地不需要
+export function getRemovalStatus(_id: number) {
+  return Promise.resolve({ data: { status: 'done' } });
+}
+export function retryRemoval(_id: number) {
+  return Promise.resolve({ data: { status: 'done' } });
+}
+export function batchRemoveBg(_ids: number[]) {
+  return Promise.resolve({ data: { triggered: 0, total: _ids.length } });
+}
+
+// ---- 背景 ----
+export async function getBackgrounds(_type?: string) {
+  await ensureInit();
+  const bgs = await db.backgrounds.toArray();
+  return {
+    data: bgs.map(b => ({
+      id: b.id!,
+      name: b.name,
+      type: b.type,
+      color: b.color || null,
+      texture_type: b.texture_type || null,
+      width: b.width,
+      height: b.height,
+      created_at: b.created_at,
+    })),
+  };
+}
+
+export async function getBackgroundFileUrl(id: number): Promise<string> {
+  await ensureInit();
+  const bg = await db.backgrounds.get(id);
+  if (!bg) return '';
+
+  // 预设纹理：Canvas 动态生成
+  if (bg.type === 'preset' && bg.texture_type) {
+    return renderTextureBg(bg.texture_type, bg.width, bg.height);
+  }
+  // 预设纯色：Canvas 动态生成
+  if (bg.type === 'preset' && bg.color) {
+    return renderColorBg(bg.color, bg.width, bg.height);
+  }
+  // 用户上传
+  if (bg.texture_uri) {
+    return readFileAsDataUrl(bg.texture_uri);
+  }
+  return '';
+}
+
+export async function createBackground(file: File) {
+  await ensureInit();
+  const { uri, filename } = await saveFile(file, 'backgrounds', 'png');
+  const thumb = await generateThumbnail(uri, 320);
+  const id = await db.backgrounds.add({
+    name: file.name.replace(/\.[^.]+$/, ''),
+    type: 'user',
+    texture_uri: uri,
+    thumbnail_uri: thumb,
+    width: 1920,
+    height: 1080,
+    created_at: new Date().toISOString(),
+  });
+  return { data: { id, name: file.name } };
+}
+
+export async function deleteBackground(id: number) {
+  const bg = await db.backgrounds.get(id);
+  if (!bg) throw new Error('背景不存在');
+  if (bg.type === 'preset') throw new Error('内置背景不可删除');
+  if (bg.texture_uri) await deleteFile(bg.texture_uri);
+  await db.backgrounds.delete(id);
+  return { data: { message: '删除成功' } };
+}
+
+// ---- 拼贴方案 ----
+export async function getCollages() {
+  await ensureInit();
+  const collages = await db.collages.orderBy('updated_at').reverse().toArray();
+  return { data: collages.map(c => ({ ...c, id: c.id! })) };
+}
+
+export async function getCollage(id: number) {
+  const c = await db.collages.get(id);
+  if (!c) throw new Error('方案不存在');
+  return { data: { ...c, id: c.id! } };
+}
+
+export async function createCollage(data: {
   name: string;
   background_id?: number;
   canvas_width?: number;
   canvas_height?: number;
   layout_data?: unknown[];
-}) => api.post('/collages', data);
-export const updateCollage = (id: number, data: {
+}) {
+  await ensureInit();
+  const now = new Date().toISOString();
+  const id = await db.collages.add({
+    name: data.name,
+    background_id: data.background_id,
+    canvas_width: data.canvas_width || 1080,
+    canvas_height: data.canvas_height || 1920,
+    layout_data: data.layout_data || [],
+    created_at: now,
+    updated_at: now,
+  });
+  return { data: { id } };
+}
+
+export async function updateCollage(id: number, data: {
   name?: string;
   background_id?: number;
   layout_data?: unknown[];
   preview_path?: string;
-}) => api.put(`/collages/${id}`, data);
-export const deleteCollage = (id: number) => api.delete(`/collages/${id}`);
-export const renameCollage = (id: number, name: string) => api.put(`/collages/${id}`, { name });
+}) {
+  const c = await db.collages.get(id);
+  if (!c) throw new Error('方案不存在');
+  const updates: Partial<CollageDoc> = { updated_at: new Date().toISOString() };
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.background_id !== undefined) updates.background_id = data.background_id;
+  if (data.layout_data !== undefined) updates.layout_data = data.layout_data;
+  if (data.preview_path !== undefined) updates.preview_uri = data.preview_path;
+  await db.collages.update(id, updates);
+  return { data: { message: '更新成功' } };
+}
 
-export default api;
+export async function deleteCollage(id: number) {
+  await db.collages.delete(id);
+  return { data: { message: '删除成功' } };
+}
+
+export async function renameCollage(id: number, name: string) {
+  return updateCollage(id, { name });
+}
+
+// ---- 报表（本地简化版） ----
+export async function getDashboardStats() {
+  await ensureInit();
+  const [matCount, catCount, collCount] = await Promise.all([
+    db.materials.count(),
+    db.categories.count(),
+    db.collages.count(),
+  ]);
+  return {
+    data: {
+      total_materials: matCount,
+      total_categories: catCount,
+      total_collages: collCount,
+    },
+  };
+}
+
+export async function getDashboardRecent(limit = 10) {
+  await ensureInit();
+  const items = await db.materials.orderBy('created_at').reverse().limit(limit).toArray();
+  return { data: items };
+}
+
+export async function getUploadTrend(_days = 7) {
+  return { data: [] };
+}

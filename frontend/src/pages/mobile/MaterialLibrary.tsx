@@ -41,7 +41,10 @@ const PAGE_SIZE = 20;
 export default function MobileMaterialLibrary() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
+  const [bgUrls, setBgUrls] = useState<Record<number, string>>({});
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [thumbUrls, setThumbUrls] = useState<Record<number, string>>({});
+  const [fullUrls, setFullUrls] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -74,11 +77,33 @@ export default function MobileMaterialLibrary() {
   useEffect(() => {
     Promise.all([getCategories(), getBackgrounds()]).then(([catRes, bgRes]) => {
       setCategories(Array.isArray(catRes.data) ? catRes.data : []);
-      setBackgrounds(Array.isArray(bgRes.data) ? bgRes.data : []);
+      const bgList = Array.isArray(bgRes.data) ? bgRes.data : [];
+      setBackgrounds(bgList);
+      // 预加载背景图片
+      bgList.forEach(bg => {
+        getBackgroundFileUrl(bg.id).then(url => {
+          setBgUrls(prev => ({ ...prev, [bg.id]: url }));
+        }).catch(() => {});
+      });
     }).catch(() => {
-      Toast.show({ content: '加载分类/背景失败，请检查网络', icon: 'fail' });
+      Toast.show({ content: '加载分类/背景失败', icon: 'fail' });
     });
   }, []);
+
+  // 预加载素材缩略图和大图
+  const loadMaterialUrls = (items: Material[]) => {
+    items.forEach(m => {
+      // 缩略图
+      getMaterialThumbUrl(m.id, 120).then(url => {
+        setThumbUrls(prev => ({ ...prev, [m.id]: url }));
+      }).catch(() => {});
+      // 大图
+      const fn = m.has_removed_bg === 'done' ? getRemovedFileUrl : getMaterialFileUrl;
+      fn(m.id).then(url => {
+        setFullUrls(prev => ({ ...prev, [m.id]: url }));
+      }).catch(() => {});
+    });
+  };
 
   const fetchMaterials = async (pageNum: number, reset: boolean) => {
     const currentFetchId = ++fetchIdRef.current;
@@ -98,14 +123,16 @@ export default function MobileMaterialLibrary() {
       const res = await getMaterials(params as never);
       if (currentFetchId !== fetchIdRef.current) return;
       const items = res.data.items || [];
+      const newItems = reset ? items : [...materials, ...items];
       if (reset) setMaterials(items);
       else setMaterials(prev => [...prev, ...items]);
+      loadMaterialUrls(items);
       setHasMore(items.length >= PAGE_SIZE);
     } catch {
       if (currentFetchId !== fetchIdRef.current) return;
       if (reset) {
         setError(true);
-        Toast.show({ content: '加载素材失败，请检查网络', icon: 'fail' });
+        Toast.show({ content: '加载素材失败', icon: 'fail' });
       }
     } finally {
       if (currentFetchId === fetchIdRef.current) setLoading(false);
@@ -115,6 +142,8 @@ export default function MobileMaterialLibrary() {
   useEffect(() => {
     setPage(1);
     setMaterials([]);
+    setThumbUrls({});
+    setFullUrls({});
     setHasMore(true);
     setSelectedIds(new Set());
     setSelectMode(false);
@@ -133,7 +162,7 @@ export default function MobileMaterialLibrary() {
   };
 
   const handleImageClick = (allImages: string[], index: number) => {
-    if (selectMode) return; // 多选模式下不预览
+    if (selectMode) return;
     previewKeyRef.current += 1;
     setPreviewImages(allImages);
     setPreviewIndex(index);
@@ -159,6 +188,8 @@ export default function MobileMaterialLibrary() {
         try {
           await deleteMaterial(m.id);
           setMaterials(prev => prev.filter(x => x.id !== m.id));
+          setThumbUrls(prev => { const n = { ...prev }; delete n[m.id]; return n; });
+          setFullUrls(prev => { const n = { ...prev }; delete n[m.id]; return n; });
           Toast.show({ content: '已删除', icon: 'success' });
         } catch {
           Toast.show({ content: '删除失败', icon: 'fail' });
@@ -195,14 +226,6 @@ export default function MobileMaterialLibrary() {
         }
       },
     });
-  };
-
-  const getImageSrc = (m: Material) => {
-    return m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id);
-  };
-
-  const getThumbSrc = (m: Material) => {
-    return m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialThumbUrl(m.id, 120);
   };
 
   const tabItems = [
@@ -266,11 +289,20 @@ export default function MobileMaterialLibrary() {
               backgrounds.map(bg => (
                 <div
                   key={bg.id}
-                  onClick={() => handleImageClick(backgrounds.map(b => getBackgroundFileUrl(b.id)), backgrounds.indexOf(bg))}
+                  onClick={() => {
+                    const urls = backgrounds.map(b => bgUrls[b.id] || '');
+                    handleImageClick(urls, backgrounds.indexOf(bg));
+                  }}
                   style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden', background: '#fff' }}
                 >
                   <div style={{ width: '100%', aspectRatio: '1', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
-                    <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    {bgUrls[bg.id] ? (
+                      <img src={bgUrls[bg.id]} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <SpinLoading style={{ '--size': '16px' }} />
+                      </div>
+                    )}
                   </div>
                   <div style={{ padding: '2px 4px', fontSize: 10, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
                 </div>
@@ -287,7 +319,7 @@ export default function MobileMaterialLibrary() {
               </div>
             ) : error && materials.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 12 }}>
-                <span style={{ color: '#999' }}>加载失败，请检查网络</span>
+                <span style={{ color: '#999' }}>加载失败</span>
                 <Button size="small" color="primary" onClick={() => { setError(false); setLoading(true); fetchMaterials(1, true); }}>
                   点击重试
                 </Button>
@@ -331,11 +363,11 @@ export default function MobileMaterialLibrary() {
                         if (selectMode) {
                           toggleSelect(m.id);
                         } else {
-                          handleImageClick(materials.map(x => getImageSrc(x)), idx);
+                          const urls = materials.map(x => fullUrls[x.id] || '');
+                          handleImageClick(urls, idx);
                         }
                       }}
                     >
-                      {/* 多选勾选框（纯CSS图标，无事件拦截） */}
                       {selectMode && (
                         <div style={{
                           position: 'absolute', top: 4, right: 4, zIndex: 10,
@@ -357,15 +389,19 @@ export default function MobileMaterialLibrary() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 8px 8px',
+                          background: 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 8px 8px',
                         }}
                       >
-                        <img
-                          src={getThumbSrc(m)}
-                          alt={m.original_name}
-                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                          loading="lazy"
-                        />
+                        {thumbUrls[m.id] ? (
+                          <img
+                            src={thumbUrls[m.id]}
+                            alt={m.original_name}
+                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <SpinLoading style={{ '--size': '16px' }} />
+                        )}
                       </div>
                       <div style={{ padding: '2px 4px', fontSize: 10, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
                     </div>
@@ -386,7 +422,6 @@ export default function MobileMaterialLibrary() {
         onClose={() => setPreviewVisible(false)}
       />
 
-      {/* 长按 ActionSheet（微信风格） */}
       <ActionSheet
         visible={actionSheetVisible}
         actions={[

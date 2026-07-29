@@ -1,32 +1,12 @@
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from rembg import remove
+from PIL import Image
+from io import BytesIO
+import uvicorn
 
-from database import engine, SessionLocal
-from models import Base
-from api.categories import router as categories_router, init_preset_categories
-from api.materials import router as materials_router
-from api.materials_detail import router as materials_detail_router
-from api.dashboard import router as dashboard_router
-from api.removal import router as removal_router
-from api.backgrounds import router as backgrounds_router, init_preset_backgrounds
-from api.collages import router as collages_router
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        init_preset_categories(db)
-        init_preset_backgrounds(db)
-    finally:
-        db.close()
-    yield
-
-
-app = FastAPI(title="Sticker Material API", lifespan=lifespan)
+app = FastAPI(title="Remove-BG Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,15 +16,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(categories_router)
-app.include_router(materials_router)
-app.include_router(materials_detail_router)
-app.include_router(dashboard_router)
-app.include_router(removal_router)
-app.include_router(backgrounds_router)
-app.include_router(collages_router)
-
+@app.post("/api/remove-bg")
+async def remove_bg(file: UploadFile = File(...)):
+    contents = await file.read()
+    img = Image.open(BytesIO(contents))
+    result = remove(img)
+    buf = BytesIO()
+    result.save(buf, format="PNG")
+    buf.seek(0)
+    return Response(content=buf.read(), media_type="image/png")
 
 @app.get("/")
 async def root():
-    return {"message": "Sticker Material API is running"}
+    return {"message": "Remove-BG Service is running"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

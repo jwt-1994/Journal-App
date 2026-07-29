@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button, Toast, Popup, Segmented, Slider, Input, Dialog } from 'antd-mobile';
+import { Button, Toast, Popup, Segmented, Slider, Input, Dialog, SpinLoading } from 'antd-mobile';
 import { useNavigate } from 'react-router-dom';
 import {
   SelectOutlined,
@@ -86,6 +86,8 @@ export default function MobileCollageEditor() {
   // 数据
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [backgrounds, setBackgrounds] = useState<BackgroundItem[]>([]);
+  const [bgUrls, setBgUrls] = useState<Record<number, string>>({});
+  const [matThumbUrls, setMatThumbUrls] = useState<Record<number, string>>({});
 
   // 画布
   const [canvasW, setCanvasW] = useState(1080);
@@ -153,8 +155,22 @@ export default function MobileCollageEditor() {
           getMaterials({ page_size: 500 }),
           getBackgrounds(),
         ]);
-        setMaterials(matRes.data.items || []);
-        setBackgrounds(bgRes.data);
+        const matItems = matRes.data.items || [];
+        setMaterials(matItems);
+        const bgItems = bgRes.data || [];
+        setBackgrounds(bgItems);
+        // 预加载背景和素材缩略图
+        bgItems.forEach((bg: BackgroundItem) => {
+          getBackgroundFileUrl(bg.id).then(url => {
+            setBgUrls(prev => ({ ...prev, [bg.id]: url }));
+          }).catch(() => {});
+        });
+        matItems.forEach((m: MaterialItem) => {
+          const fn = m.has_removed_bg === 'done' ? getRemovedFileUrl : getMaterialThumbUrl;
+          fn(m.id, 200).then(url => {
+            setMatThumbUrls(prev => ({ ...prev, [m.id]: url }));
+          }).catch(() => {});
+        });
       } catch { /* ignore */ }
     })();
   }, []);
@@ -164,7 +180,9 @@ export default function MobileCollageEditor() {
     if (bg) {
       const img = new window.Image();
       img.crossOrigin = 'anonymous';
-      img.src = getBackgroundFileUrl(bg.id);
+      getBackgroundFileUrl(bg.id).then(url => {
+        img.src = url;
+      });
       img.onload = () => setBgImage(img);
     } else { setBgImage(null); }
   }, [selectedBgId, backgrounds]);
@@ -235,7 +253,7 @@ export default function MobileCollageEditor() {
       img.src = blobUrl;
       if (img.complete && img.naturalWidth > 0) onLoad();
     } catch {
-      Toast.show({ content: '素材加载失败，请检查网络', icon: 'fail' });
+      Toast.show({ content: '素材加载失败', icon: 'fail' });
       setShowMaterialSheet(false);
     }
   };
@@ -253,12 +271,10 @@ export default function MobileCollageEditor() {
     setContextMenu(null);
 
     if (touch.touches.length === 2) {
-      // 双指：捏合缩放 + 平移
       const dx = touch.touches[0].clientX - touch.touches[1].clientX;
       const dy = touch.touches[0].clientY - touch.touches[1].clientY;
       pinchRef.current.dist = Math.sqrt(dx * dx + dy * dy);
       pinchRef.current.lastScale = scale;
-      // 记录双指中点作为平移起点
       panRef.current.startX = (touch.touches[0].clientX + touch.touches[1].clientX) / 2;
       panRef.current.startY = (touch.touches[0].clientY + touch.touches[1].clientY) / 2;
       panRef.current.lastX = panX;
@@ -268,7 +284,6 @@ export default function MobileCollageEditor() {
     }
 
     if (touch.touches.length === 1) {
-      // 双击检测（重置缩放）
       const now = Date.now();
       if (now - lastTapRef.current < 300) {
         resetView();
@@ -277,7 +292,6 @@ export default function MobileCollageEditor() {
       }
       lastTapRef.current = now;
 
-      // 长按检测（上下文菜单）
       if (activeTool === 'select') {
         const stage = stageRef.current;
         if (!stage) return;
@@ -309,14 +323,12 @@ export default function MobileCollageEditor() {
 
   const handleTouchMove = (e: any) => {
     const touch = e.evt;
-    // 取消长按（手指移动了）
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
 
     if (touch.touches.length === 2 && panRef.current.panning) {
-      // 缩放
       const dx = touch.touches[0].clientX - touch.touches[1].clientX;
       const dy = touch.touches[0].clientY - touch.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -324,7 +336,6 @@ export default function MobileCollageEditor() {
         const newScale = pinchRef.current.lastScale * (dist / pinchRef.current.dist);
         setScale(Math.max(0.2, Math.min(3, newScale)));
       }
-      // 平移
       const midX = (touch.touches[0].clientX + touch.touches[1].clientX) / 2;
       const midY = (touch.touches[0].clientY + touch.touches[1].clientY) / 2;
       setPanX(panRef.current.lastX + (midX - panRef.current.startX));
@@ -337,7 +348,6 @@ export default function MobileCollageEditor() {
   };
 
   const handleTouchEnd = () => {
-    // 清除长按计时器
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
@@ -555,28 +565,42 @@ export default function MobileCollageEditor() {
       const layout = d.layout_data || [];
       if (layout.length === 0) { setElements([]); setShowLoadSheet(false); return; }
 
-      const newEls: CanvasElement[] = [];
-      let loaded = 0;
       const imgItems = layout.filter((l: any) => l.type === 'image');
-
       if (imgItems.length === 0) {
         setElements(layout as CanvasElement[]);
         setShowLoadSheet(false);
         return;
       }
 
-      imgItems.forEach((l: any) => {
+      // 异步加载图片素材
+      const newEls: CanvasElement[] = [];
+      let loaded = 0;
+      for (const l of imgItems) {
         const m = materials.find(m => m.id === l.material_id);
         if (m) {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          img.src = m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id);
-          img.onload = () => { newEls.push({ ...l, img, material_id: m.id }); loaded++; if (loaded === imgItems.length) finalize(); };
+          try {
+            const blobUrl = await loadMaterialImage(m.id, m.has_removed_bg === 'done');
+            const img = new window.Image();
+            img.src = blobUrl;
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => { newEls.push({ ...l, img, material_id: m.id }); URL.revokeObjectURL(blobUrl); resolve(); };
+              img.onerror = () => { newEls.push(l); resolve(); };
+            });
+          } catch { newEls.push(l); }
         } else {
-          newEls.push(l); loaded++; if (loaded === imgItems.length) finalize();
+          newEls.push(l);
         }
-      });
-      const finalize = () => { setElements(newEls); setUndoStack([]); setRedoStack([]); setShowLoadSheet(false); Toast.show({ content: '方案已加载', icon: 'success' }); };
+        loaded++;
+      }
+
+      // 非图片元素直接添加
+      const nonImgItems = layout.filter((l: any) => l.type !== 'image');
+      const allEls = [...newEls, ...nonImgItems];
+      setElements(allEls);
+      setUndoStack([]);
+      setRedoStack([]);
+      setShowLoadSheet(false);
+      Toast.show({ content: '方案已加载', icon: 'success' });
     } catch { Toast.show({ content: '加载失败', icon: 'fail' }); }
   };
 
@@ -624,7 +648,13 @@ export default function MobileCollageEditor() {
         <div key={bg.id} onClick={() => { setSelectedBgId(bg.id); setShowBgSheet(false); }}
           style={{ padding: 8, border: selectedBgId === bg.id ? '2px solid #1677ff' : '1px solid #e8e8e8', borderRadius: 8, cursor: 'pointer', textAlign: 'center', background: selectedBgId === bg.id ? '#e6f4ff' : '#fff' }}>
           <div style={{ width: '100%', height: 60, borderRadius: 4, overflow: 'hidden', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
-            <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {bgUrls[bg.id] ? (
+              <img src={bgUrls[bg.id]} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <SpinLoading style={{ '--size': '14px' }} />
+              </div>
+            )}
           </div>
           <div style={{ fontSize: 10, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
         </div>
@@ -649,7 +679,6 @@ export default function MobileCollageEditor() {
         paddingTop: 'env(safe-area-inset-top, 0)',
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
       }}>
-        {/* 顶部：返回/上一步 */}
         <div style={{ padding: '12px 16px 8px', flexShrink: 0 }}>
           <Button size="small" fill="none" onClick={() => {
             if (setupStep === 1) navigate(-1);
@@ -659,7 +688,6 @@ export default function MobileCollageEditor() {
           </Button>
         </div>
 
-        {/* Step 1：选择画布尺寸 */}
         {setupStep === 1 && (
           <>
             <h2 style={{ textAlign: 'center', margin: '0 0 12px', flexShrink: 0 }}>选择画布尺寸</h2>
@@ -691,7 +719,6 @@ export default function MobileCollageEditor() {
           </>
         )}
 
-        {/* Step 2：选择背景 */}
         {setupStep === 2 && (
           <>
             <h2 style={{ textAlign: 'center', margin: '0 0 12px', flexShrink: 0 }}>选择背景</h2>
@@ -717,7 +744,7 @@ export default function MobileCollageEditor() {
       paddingBottom: 'env(safe-area-inset-bottom, 0)',
       paddingLeft: 'env(safe-area-inset-left, 0)',
       paddingRight: 'env(safe-area-inset-right, 0)',
-      touchAction: 'none', // 禁用 WebView 默认手势
+      touchAction: 'none',
       WebkitUserSelect: 'none', userSelect: 'none',
     }}>
       {/* 画布区域 */}
@@ -883,7 +910,7 @@ export default function MobileCollageEditor() {
         </div>
       )}
 
-      {/* 快捷操作按钮 — 避开 iOS 状态栏（Dynamic Island 约 60px） */}
+      {/* 快捷操作按钮 */}
       <div style={{ position: 'fixed', top: 60, left: 16, display: 'flex', gap: 8, zIndex: 50, flexWrap: 'wrap' }}>
         <Button size="mini" fill="none" style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 12 }}
           onClick={() => navigate(-1)}><LeftOutlined /> 返回</Button>
@@ -906,9 +933,12 @@ export default function MobileCollageEditor() {
             {filteredMaterials.map(m => (
               <div key={m.id} onClick={() => addMaterial(m)}
                 style={{ cursor: 'pointer', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', textAlign: 'center' }}>
-                <div style={{ width: '100%', aspectRatio: '1', background: m.has_removed_bg === 'done' ? 'transparent' : 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src={m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialThumbUrl(m.id, 200)}
-                    alt={m.original_name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                <div style={{ width: '100%', aspectRatio: '1', background: 'repeating-conic-gradient(#e8e8e8 0% 25%, transparent 0% 50%) 50% / 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {matThumbUrls[m.id] ? (
+                    <img src={matThumbUrls[m.id]} alt={m.original_name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <SpinLoading style={{ '--size': '16px' }} />
+                  )}
                 </div>
                 <div style={{ fontSize: 11, padding: '4px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
               </div>
