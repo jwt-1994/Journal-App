@@ -36,7 +36,7 @@ export interface CollageDoc {
   background_id?: number;
   canvas_width: number;
   canvas_height: number;
-  layout_data: unknown[];
+  layout_data: any[];
   preview_uri?: string;
   created_at: string;
   updated_at: string;

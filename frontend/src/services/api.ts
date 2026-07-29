@@ -282,7 +282,7 @@ export async function getBackgroundFileUrl(id: number): Promise<string> {
 
 export async function createBackground(file: File) {
   await ensureInit();
-  const { uri, filename } = await saveFile(file, 'backgrounds', 'png');
+  const { uri } = await saveFile(file, 'backgrounds', 'png');
   const thumb = await generateThumbnail(uri, 320);
   const id = await db.backgrounds.add({
     name: file.name.replace(/\.[^.]+$/, ''),
