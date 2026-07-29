@@ -86,6 +86,13 @@ export const getMaterial = (id: number) => api.get(`/materials/${id}`);
 export const getMaterialFileUrl = (id: number) => `${baseURL}/materials/${id}/file`;
 export const getMaterialThumbUrl = (id: number, size = 200) => `${baseURL}/materials/${id}/file?thumb=${size}`;
 export const getRemovedFileUrl = (id: number) => `${baseURL}/materials/${id}/removed-file`;
+
+// 通过 axios 加载素材图片为 blob URL（解决 Capacitor WebView 跨域问题）
+export const loadMaterialImage = async (id: number, useRemovedBg: boolean): Promise<string> => {
+  const path = useRemovedBg ? `/materials/${id}/removed-file` : `/materials/${id}/file`;
+  const resp = await api.get(path, { responseType: 'blob' });
+  return URL.createObjectURL(resp.data);
+};
 export const getRemovalStatus = (id: number) => api.get(`/materials/${id}/removal-status`);
 export const retryRemoval = (id: number) => api.post(`/materials/${id}/retry-removal`);
 export const deleteMaterial = (id: number) => api.delete(`/materials/${id}`);

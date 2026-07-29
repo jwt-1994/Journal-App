@@ -22,9 +22,9 @@ import {
   getMaterials,
   getBackgrounds,
   getBackgroundFileUrl,
-  getMaterialFileUrl,
-  getRemovedFileUrl,
   getMaterialThumbUrl,
+  getRemovedFileUrl,
+  loadMaterialImage,
   getCollages,
   getCollage,
   createCollage,
@@ -208,12 +208,8 @@ export default function MobileCollageEditor() {
   // --- 素材添加 ---
   const addMaterial = async (m: MaterialItem) => {
     saveState();
-    const url = m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id);
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const blobUrl = await loadMaterialImage(m.id, m.has_removed_bg === 'done');
       const img = new window.Image();
       const onLoad = () => {
         URL.revokeObjectURL(blobUrl);
@@ -1020,7 +1016,10 @@ export default function MobileCollageEditor() {
       {/* 加载弹窗 */}
       <Popup visible={showLoadSheet} onClose={() => setShowLoadSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
-          <h3 style={{ margin: '0 0 12px' }}>加载拼贴方案</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>加载拼贴方案</h3>
+            <Button size="mini" fill="none" onClick={() => setShowLoadSheet(false)}>关闭</Button>
+          </div>
           {collageList.length === 0 ? (
             <div style={{ color: '#999', textAlign: 'center', padding: 24 }}>暂无已保存的方案</div>
           ) : (

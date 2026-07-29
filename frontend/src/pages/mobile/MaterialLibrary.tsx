@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog } from 'antd-mobile';
+import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog, ActionSheet } from 'antd-mobile';
 import { CheckCircleFill } from 'antd-mobile-icons';
 import {
   getCategories,
@@ -62,6 +62,11 @@ export default function MobileMaterialLibrary() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
+
+  // 长按 ActionSheet
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [actionSheetTarget, setActionSheetTarget] = useState<Material | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 防竞态
   const fetchIdRef = useRef(0);
@@ -141,6 +146,24 @@ export default function MobileMaterialLibrary() {
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+  };
+
+  const handleSingleDelete = (m: Material) => {
+    Dialog.confirm({
+      title: '确定删除？',
+      content: `将删除「${m.original_name}」，不可恢复`,
+      confirmText: '删除',
+      cancelText: '取消',
+      onConfirm: async () => {
+        try {
+          await deleteMaterial(m.id);
+          setMaterials(prev => prev.filter(x => x.id !== m.id));
+          Toast.show({ content: '已删除', icon: 'success' });
+        } catch {
+          Toast.show({ content: '删除失败', icon: 'fail' });
+        }
+      },
     });
   };
 
@@ -282,6 +305,27 @@ export default function MobileMaterialLibrary() {
                         position: 'relative',
                         border: isSelected ? '2px solid #1677ff' : '1px solid #f0f0f0',
                         borderRadius: 6, overflow: 'hidden', background: '#fff',
+                        WebkitUserSelect: 'none', userSelect: 'none',
+                        WebkitTouchCallout: 'none',
+                      }}
+                      onTouchStart={() => {
+                        if (selectMode) return;
+                        longPressTimerRef.current = setTimeout(() => {
+                          setActionSheetTarget(m);
+                          setActionSheetVisible(true);
+                        }, 500);
+                      }}
+                      onTouchEnd={() => {
+                        if (longPressTimerRef.current) {
+                          clearTimeout(longPressTimerRef.current);
+                          longPressTimerRef.current = null;
+                        }
+                      }}
+                      onTouchMove={() => {
+                        if (longPressTimerRef.current) {
+                          clearTimeout(longPressTimerRef.current);
+                          longPressTimerRef.current = null;
+                        }
                       }}
                       onClick={() => {
                         if (selectMode) {
@@ -340,6 +384,33 @@ export default function MobileMaterialLibrary() {
         visible={previewVisible}
         defaultIndex={previewIndex}
         onClose={() => setPreviewVisible(false)}
+      />
+
+      {/* 长按 ActionSheet（微信风格） */}
+      <ActionSheet
+        visible={actionSheetVisible}
+        actions={[
+          {
+            text: '多选',
+            key: 'multi',
+            onClick: () => {
+              setActionSheetVisible(false);
+              setSelectMode(true);
+              setSelectedIds(new Set());
+            },
+          },
+          {
+            text: '删除',
+            key: 'delete',
+            danger: true,
+            onClick: () => {
+              setActionSheetVisible(false);
+              if (actionSheetTarget) handleSingleDelete(actionSheetTarget);
+            },
+          },
+        ]}
+        onClose={() => setActionSheetVisible(false)}
+        cancelText="取消"
       />
     </div>
   );
