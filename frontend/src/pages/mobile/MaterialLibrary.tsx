@@ -420,27 +420,25 @@ export default function MobileMaterialLibrary() {
           {
             text: '多选',
             key: 'multi',
-            onClick: () => {
-              setActionSheetVisible(false);
-              setSelectMode(true);
-              setSelectedIds(new Set());
-            },
           },
           {
             text: '删除',
             key: 'delete',
             danger: true,
-            onClick: () => {
-              setActionSheetVisible(false);
-              // 延迟确保 ActionSheet 关闭动画完成后再弹 Dialog
-              setTimeout(() => {
-                if (actionSheetTarget) handleSingleDelete(actionSheetTarget);
-              }, 300);
-            },
           },
         ]}
-        onClose={() => setActionSheetVisible(false)}
+        onAction={(action) => {
+          if (action.key === 'multi') {
+            setSelectMode(true);
+            setSelectedIds(new Set());
+          } else if (action.key === 'delete' && actionSheetTarget) {
+            setTimeout(() => {
+              handleSingleDelete(actionSheetTarget);
+            }, 300);
+          }
+        }}
         cancelText="取消"
+        onClose={() => setActionSheetVisible(false)}
       />
     </div>
   );
