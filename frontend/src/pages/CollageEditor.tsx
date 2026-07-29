@@ -128,7 +128,9 @@ export default function CollageEditor() {
   // 数据
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [backgrounds, setBackgrounds] = useState<BackgroundItem[]>([]);
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [bgUrls, setBgUrls] = useState<Record<number, string>>({});
+  const [matUrls, setMatUrls] = useState<Record<number, string>>({});
+  const [categories, setCategories] = useState<{ id: number; name: string; is_preset?: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 画布
@@ -200,7 +202,20 @@ export default function CollageEditor() {
           getCategories(),
         ]);
         setMaterials(matRes.data.items || []);
-        setBackgrounds(bgRes.data);
+        const matItems: MaterialItem[] = matRes.data.items || [];
+        setMaterials(matItems);
+        matItems.forEach((m: MaterialItem) => {
+          getMaterialFileUrl(m.id).then(url => {
+            setMatUrls(prev => ({ ...prev, [m.id]: url }));
+          }).catch(() => {});
+        });
+        const bgs: BackgroundItem[] = bgRes.data;
+        setBackgrounds(bgs);
+        bgs.forEach(bg => {
+          getBackgroundFileUrl(bg.id).then(url => {
+            setBgUrls(prev => ({ ...prev, [bg.id]: url }));
+          }).catch(() => {});
+        });
         setCategories(catRes.data);
       } catch { message.error('加载数据失败'); }
       finally { setLoading(false); }
@@ -208,13 +223,16 @@ export default function CollageEditor() {
   }, []);
 
   useEffect(() => {
-    const bg = backgrounds.find(b => b.id === selectedBgId);
-    if (bg) {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      img.src = getBackgroundFileUrl(bg.id);
-      img.onload = () => setBgImage(img);
-    } else { setBgImage(null); }
+    (async () => {
+      const bg = backgrounds.find(b => b.id === selectedBgId);
+      if (bg) {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        const url = await getBackgroundFileUrl(bg.id);
+        img.src = url;
+        img.onload = () => setBgImage(img);
+      } else { setBgImage(null); }
+    })();
   }, [selectedBgId, backgrounds]);
 
   // --- 撤销/重做 ---
@@ -297,13 +315,14 @@ export default function CollageEditor() {
   };
 
   // --- 素材添加 ---
-  const addMaterial = (m: MaterialItem) => {
+  const addMaterial = async (m: MaterialItem) => {
     saveState();
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
-    img.src = m.has_removed_bg === 'done'
-      ? `${getMaterialFileUrl(m.id)}?removed=true`
-      : getMaterialFileUrl(m.id);
+    const url = m.has_removed_bg === 'done'
+      ? await getMaterialFileUrl(m.id)
+      : await getMaterialFileUrl(m.id);
+    img.src = url;
     img.onload = () => {
       const s = Math.min(200 / img.width, 200 / img.height);
       const w = img.width * s;
@@ -635,7 +654,7 @@ export default function CollageEditor() {
       const d = res.data;
       setCollageId(d.id);
       setCollageName(d.name);
-      setSelectedBgId(d.background_id);
+      setSelectedBgId(d.background_id ?? null);
       setCanvasW(d.canvas_width || DEFAULT_CANVAS_W);
       setCanvasH(d.canvas_height || DEFAULT_CANVAS_H);
       setShowCanvasSetup(false);
@@ -645,13 +664,14 @@ export default function CollageEditor() {
       let loaded = 0;
       const total = layout.filter((l: any) => l.type === 'image').length;
 
-      layout.forEach((l: any) => {
+      layout.forEach(async (l: any) => {
         if (l.type === 'image') {
           const m = materials.find(m => m.id === l.material_id);
           if (m) {
             const img = new window.Image();
             img.crossOrigin = 'anonymous';
-            img.src = m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialFileUrl(m.id);
+            const url = await getMaterialFileUrl(m.id);
+            img.src = url;
             img.onload = () => {
               newEls.push({ ...l, img, material_id: m.id });
               loaded++;
@@ -781,7 +801,7 @@ export default function CollageEditor() {
           }}
         >
           <div style={{ width: '100%', height: compact ? 40 : 60, borderRadius: compact ? 3 : 4, overflow: 'hidden', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
-            <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={bgUrls[bg.id]} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div style={{ fontSize: compact ? 10 : 11, marginTop: compact ? 2 : 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
         </div>
@@ -1216,7 +1236,7 @@ export default function CollageEditor() {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#1677ff'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,119,255,0.2)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#f0f0f0'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
-                  <img src={m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialFileUrl(m.id)}
+                  <img src={matUrls[m.id]}
                     alt={m.original_name} style={{ width: '100%', height: 120, objectFit: 'contain', borderRadius: 4 }} />
                   <div style={{ fontSize: 12, marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.original_name}</div>
                 </div>

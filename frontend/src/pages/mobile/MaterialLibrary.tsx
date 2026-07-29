@@ -26,6 +26,7 @@ interface Material {
 interface Category {
   id: number;
   name: string;
+  is_preset?: boolean;
 }
 
 interface Background {

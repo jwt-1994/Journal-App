@@ -24,6 +24,7 @@ interface Material {
 interface Category {
   id: number;
   name: string;
+  is_preset?: boolean;
 }
 
 interface Background {
@@ -39,20 +40,18 @@ const PAGE_SIZE = 24;
 export default function MaterialLibrary() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
+  const [bgUrls, setBgUrls] = useState<Record<number, string>>({});
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [matUrls, setMatUrls] = useState<Record<number, string>>({});
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // 标签页
   const [activeTab, setActiveTab] = useState('all');
-
-  // 搜索和排序
   const [searchText, setSearchText] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
 
-  // 预览
   const [previewSrc, setPreviewSrc] = useState('');
   const [previewVisible, setPreviewVisible] = useState(false);
 
@@ -66,7 +65,13 @@ export default function MaterialLibrary() {
   const fetchBackgrounds = async () => {
     try {
       const res = await getBackgrounds();
-      setBackgrounds(res.data);
+      const bgs: Background[] = res.data;
+      setBackgrounds(bgs);
+      bgs.forEach(bg => {
+        getBackgroundFileUrl(bg.id).then(url => {
+          setBgUrls(prev => ({ ...prev, [bg.id]: url }));
+        }).catch(() => {});
+      });
     } catch { /* ignore */ }
   };
 
@@ -85,8 +90,16 @@ export default function MaterialLibrary() {
         params.category_id = Number(activeTab);
       }
       const res = await getMaterials(params as never);
-      setMaterials(res.data.items);
+      const items: Material[] = res.data.items;
+      setMaterials(items);
       setTotal(res.data.total);
+      // 预加载素材URL
+      items.forEach(m => {
+        const fn = m.has_removed_bg === 'done' ? getRemovedFileUrl : getMaterialFileUrl;
+        fn(m.id).then(url => {
+          setMatUrls(prev => ({ ...prev, [m.id]: url }));
+        }).catch(() => {});
+      });
     } catch {
       message.error('加载素材失败');
     } finally {
@@ -105,13 +118,21 @@ export default function MaterialLibrary() {
     }
   }, [fetchMaterials, activeTab]);
 
-  // 切换标签页重置页码
   useEffect(() => {
     setPage(1);
   }, [activeTab, searchText]);
 
-  const handlePreview = (src: string, _title: string) => {
-    setPreviewSrc(src);
+  const handlePreview = async (m: Material) => {
+    const url = m.has_removed_bg === 'done'
+      ? await getRemovedFileUrl(m.id)
+      : await getMaterialFileUrl(m.id);
+    setPreviewSrc(url);
+    setPreviewVisible(true);
+  };
+
+  const handleBgPreview = async (bg: Background) => {
+    const url = await getBackgroundFileUrl(bg.id);
+    setPreviewSrc(url);
     setPreviewVisible(true);
   };
 
@@ -123,7 +144,6 @@ export default function MaterialLibrary() {
 
   return (
     <div>
-      {/* 搜索/排序栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <Input
           placeholder="搜索素材..."
@@ -151,10 +171,8 @@ export default function MaterialLibrary() {
         />
       </div>
 
-      {/* 分类标签页 */}
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
-      {/* 背景 Tab */}
       {activeTab === 'backgrounds' && (
         <Spin spinning={backgrounds.length === 0}>
           {backgrounds.length === 0 ? (
@@ -171,12 +189,12 @@ export default function MaterialLibrary() {
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                     }}
-                    onClick={() => handlePreview(getBackgroundFileUrl(bg.id), bg.name)}
+                    onClick={() => handleBgPreview(bg)}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = '#1677ff'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,119,255,0.2)'; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = '#f0f0f0'; e.currentTarget.style.boxShadow = 'none'; }}
                   >
-                    <div style={{ width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg.color ? `#${bg.color}` : '#f5f5f5' }}>
-                      <img src={getBackgroundFileUrl(bg.id)} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg.color || '#f5f5f5' }}>
+                      <img src={bgUrls[bg.id]} alt={bg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                     <div style={{ padding: '6px 8px', fontSize: 12, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bg.name}</div>
                   </div>
@@ -187,7 +205,6 @@ export default function MaterialLibrary() {
         </Spin>
       )}
 
-      {/* 素材 Tab */}
       {activeTab !== 'backgrounds' && (
         <Spin spinning={loading}>
           {materials.length === 0 && !loading ? (
@@ -205,10 +222,7 @@ export default function MaterialLibrary() {
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                       }}
-                      onClick={() => handlePreview(
-                        m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id),
-                        m.original_name,
-                      )}
+                      onClick={() => handlePreview(m)}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#1677ff'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,119,255,0.2)'; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#f0f0f0'; e.currentTarget.style.boxShadow = 'none'; }}
                     >
@@ -223,7 +237,7 @@ export default function MaterialLibrary() {
                         }}
                       >
                         <img
-                          src={m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id)}
+                          src={matUrls[m.id]}
                           alt={m.original_name}
                           style={{ maxWidth: '100%', maxHeight: 120, objectFit: 'contain' }}
                         />
@@ -248,7 +262,6 @@ export default function MaterialLibrary() {
         </Spin>
       )}
 
-      {/* 大图预览 */}
       <Image
         style={{ display: 'none' }}
         src={previewSrc}

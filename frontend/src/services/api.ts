@@ -306,13 +306,13 @@ export async function deleteBackground(id: number) {
 export async function getCollages() {
   await ensureInit();
   const collages = await db.collages.orderBy('updated_at').reverse().toArray();
-  return { data: collages.map(c => ({ ...c, id: c.id! })) };
+  return { data: collages.map(c => ({ ...c, id: c.id!, background_id: c.background_id ?? null })) };
 }
 
 export async function getCollage(id: number) {
   const c = await db.collages.get(id);
   if (!c) throw new Error('方案不存在');
-  return { data: { ...c, id: c.id! } };
+  return { data: { ...c, id: c.id!, background_id: c.background_id ?? null } };
 }
 
 export async function createCollage(data: {
@@ -365,16 +365,31 @@ export async function renameCollage(id: number, name: string) {
 // ---- 报表（本地简化版） ----
 export async function getDashboardStats() {
   await ensureInit();
-  const [matCount, catCount, collCount] = await Promise.all([
-    db.materials.count(),
-    db.categories.count(),
-    db.collages.count(),
-  ]);
+  const matCount = await db.materials.count();
+  const catCount = await db.categories.count();
+  const collCount = await db.collages.count();
+
+  // 分类统计
+  const cats = await db.categories.toArray();
+  const category_stats = await Promise.all(
+    cats.map(async c => ({
+      name: c.name,
+      count: await db.materials.where('category_id').equals(c.id!).count(),
+    }))
+  );
+
+  // 计算总文件大小
+  const allMats = await db.materials.toArray();
+  const total_size_bytes = allMats.reduce((sum, m) => sum + (m.file_size || 0), 0);
+
   return {
     data: {
       total_materials: matCount,
       total_categories: catCount,
       total_collages: collCount,
+      category_stats,
+      total_size_bytes,
+      bg_status_stats: { none: 0, processing: 0, done: matCount, failed: 0 },
     },
   };
 }
@@ -382,9 +397,42 @@ export async function getDashboardStats() {
 export async function getDashboardRecent(limit = 10) {
   await ensureInit();
   const items = await db.materials.orderBy('created_at').reverse().limit(limit).toArray();
-  return { data: items };
+  const cats = await db.categories.toArray();
+  const catMap = new Map(cats.map(c => [c.id!, c.name]));
+  return {
+    data: items.map(m => ({
+      id: m.id!,
+      filename: m.filename,
+      original_name: m.original_name,
+      category_name: catMap.get(m.category_id) || '',
+      file_size: m.file_size,
+      created_at: m.created_at,
+    })),
+  };
 }
 
-export async function getUploadTrend(_days = 7) {
-  return { data: [] };
+export async function getUploadTrend(days = 7) {
+  await ensureInit();
+  const result: { date: string; count: number }[] = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    result.push({ date: dateStr, count: 0 });
+  }
+
+  // 按日期统计
+  const mats = await db.materials.toArray();
+  const dateCounts = new Map<string, number>();
+  mats.forEach(m => {
+    const date = m.created_at.slice(0, 10);
+    dateCounts.set(date, (dateCounts.get(date) || 0) + 1);
+  });
+
+  result.forEach(r => {
+    r.count = dateCounts.get(r.date) || 0;
+  });
+
+  return { data: result };
 }

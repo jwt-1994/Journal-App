@@ -8,14 +8,13 @@ interface Background {
   name: string;
   type: 'preset' | 'user';
   color: string | null;
-  texture_path: string | null;
-  thumbnail_path: string | null;
   width: number;
   height: number;
 }
 
 export default function BackgroundLibrary() {
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
+  const [bgUrls, setBgUrls] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -26,7 +25,14 @@ export default function BackgroundLibrary() {
     try {
       const type = activeTab === 'all' ? undefined : activeTab;
       const res = await getBackgrounds(type);
-      setBackgrounds(res.data);
+      const bgs: Background[] = res.data;
+      setBackgrounds(bgs);
+      // 预加载URL
+      bgs.forEach(bg => {
+        getBackgroundFileUrl(bg.id).then(url => {
+          setBgUrls(prev => ({ ...prev, [bg.id]: url }));
+        }).catch(() => {});
+      });
     } catch {
       message.error('加载背景失败');
     } finally {
@@ -59,8 +65,9 @@ export default function BackgroundLibrary() {
     }
   };
 
-  const handlePreview = (bg: Background) => {
-    setPreviewUrl(getBackgroundFileUrl(bg.id));
+  const handlePreview = async (bg: Background) => {
+    const url = await getBackgroundFileUrl(bg.id);
+    setPreviewUrl(url);
     setPreviewVisible(true);
   };
 
@@ -136,7 +143,7 @@ export default function BackgroundLibrary() {
                     <span style={{ color: '#999', fontSize: 14 }}>{bg.name}</span>
                   ) : (
                     <img
-                      src={bg.thumbnail_path ? getBackgroundFileUrl(bg.id) : undefined}
+                      src={bgUrls[bg.id]}
                       alt={bg.name}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => {

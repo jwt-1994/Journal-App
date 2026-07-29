@@ -8,6 +8,8 @@ const { Dragger } = Upload;
 interface Category {
   id: number;
   name: string;
+  is_preset?: boolean;
+  material_count?: number;
 }
 
 export default function UploadPage() {

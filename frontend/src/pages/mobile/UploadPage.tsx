@@ -6,6 +6,8 @@ import { getCategories, uploadMaterial } from '../../services/api';
 interface Category {
   id: number;
   name: string;
+  is_preset?: boolean;
+  material_count?: number;
 }
 
 // 图片压缩：限制最大宽度 1920px，避免大图导致内存崩溃
