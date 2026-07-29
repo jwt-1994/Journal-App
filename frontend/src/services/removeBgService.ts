@@ -1,7 +1,7 @@
 // 抠图微服务请求
 // 部署地址：当前用电脑IP，后续可改为云服务器IP
 
-const REMBG_URL = 'http://172.17.246.41:8000/api/remove-bg';
+const REMBG_URL = 'http://192.168.137.1:8000/api/remove-bg';
 const TIMEOUT_MS = 15000;
 
 export async function removeBackground(file: Blob | File): Promise<Blob> {

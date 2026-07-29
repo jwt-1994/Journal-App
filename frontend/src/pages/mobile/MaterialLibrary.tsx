@@ -432,7 +432,10 @@ export default function MobileMaterialLibrary() {
             danger: true,
             onClick: () => {
               setActionSheetVisible(false);
-              if (actionSheetTarget) handleSingleDelete(actionSheetTarget);
+              // 延迟确保 ActionSheet 关闭动画完成后再弹 Dialog
+              setTimeout(() => {
+                if (actionSheetTarget) handleSingleDelete(actionSheetTarget);
+              }, 300);
             },
           },
         ]}
