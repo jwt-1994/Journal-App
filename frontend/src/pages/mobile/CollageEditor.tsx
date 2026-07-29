@@ -22,6 +22,7 @@ import {
   getMaterials,
   getBackgrounds,
   getBackgroundFileUrl,
+  getMaterialFileUrl,
   getMaterialThumbUrl,
   getRemovedFileUrl,
   loadMaterialImage,
@@ -569,7 +570,7 @@ export default function MobileCollageEditor() {
         if (m) {
           const img = new window.Image();
           img.crossOrigin = 'anonymous';
-          img.src = m.has_removed_bg === 'done' ? `${getMaterialFileUrl(m.id)}?removed=true` : getMaterialFileUrl(m.id);
+          img.src = m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id);
           img.onload = () => { newEls.push({ ...l, img, material_id: m.id }); loaded++; if (loaded === imgItems.length) finalize(); };
         } else {
           newEls.push(l); loaded++; if (loaded === imgItems.length) finalize();
