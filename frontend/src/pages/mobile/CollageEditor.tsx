@@ -206,32 +206,41 @@ export default function MobileCollageEditor() {
   };
 
   // --- 素材添加 ---
-  const addMaterial = (m: MaterialItem) => {
+  const addMaterial = async (m: MaterialItem) => {
     saveState();
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
     const url = m.has_removed_bg === 'done' ? getRemovedFileUrl(m.id) : getMaterialFileUrl(m.id);
-    const onLoad = () => {
-      const s = Math.min(200 / img.width, 200 / img.height);
-      const el: CanvasElement = {
-        id: genId(), type: 'image',
-        x: canvasW / 2 - (img.width * s) / 2,
-        y: canvasH / 2 - (img.height * s) / 2,
-        width: img.width * s, height: img.height * s,
-        rotation: 0, zIndex: elements.length, visible: true,
-        material_id: m.id, img,
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const img = new window.Image();
+      const onLoad = () => {
+        URL.revokeObjectURL(blobUrl);
+        const s = Math.min(200 / img.width, 200 / img.height);
+        const el: CanvasElement = {
+          id: genId(), type: 'image',
+          x: canvasW / 2 - (img.width * s) / 2,
+          y: canvasH / 2 - (img.height * s) / 2,
+          width: img.width * s, height: img.height * s,
+          rotation: 0, zIndex: elements.length, visible: true,
+          material_id: m.id, img,
+        };
+        setElements(prev => [...prev, el]);
+        setShowMaterialSheet(false);
       };
-      setElements(prev => [...prev, el]);
+      img.onload = onLoad;
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        Toast.show({ content: '图片解码失败', icon: 'fail' });
+        setShowMaterialSheet(false);
+      };
+      img.src = blobUrl;
+      if (img.complete && img.naturalWidth > 0) onLoad();
+    } catch {
+      Toast.show({ content: '素材加载失败，请检查网络', icon: 'fail' });
       setShowMaterialSheet(false);
-    };
-    img.onload = onLoad;
-    img.onerror = () => {
-      Toast.show({ content: '素材加载失败', icon: 'fail' });
-      setShowMaterialSheet(false);
-    };
-    img.src = url;
-    // 兜底：缓存图片可能已完成加载，onload 不会触发
-    if (img.complete) onLoad();
+    }
   };
 
   // --- 重置缩放/平移 ---
@@ -913,7 +922,7 @@ export default function MobileCollageEditor() {
       </Popup>
 
       {/* 属性编辑弹出面板 */}
-      <Popup visible={showPropertiesSheet} onClose={() => setShowPropertiesSheet(false)} position="bottom" bodyStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showPropertiesSheet} onClose={() => setShowPropertiesSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>属性</h3>
           {!selectedElement ? (
@@ -992,7 +1001,7 @@ export default function MobileCollageEditor() {
       </Popup>
 
       {/* 背景选择 */}
-      <Popup visible={showBgSheet} onClose={() => setShowBgSheet(false)} position="bottom" bodyStyle={{ maxHeight: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showBgSheet} onClose={() => setShowBgSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ maxHeight: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>选择背景</h3>
           {renderBgCards()}
@@ -1000,7 +1009,7 @@ export default function MobileCollageEditor() {
       </Popup>
 
       {/* 保存弹窗 */}
-      <Popup visible={showSaveSheet} onClose={() => setShowSaveSheet(false)} position="bottom" bodyStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showSaveSheet} onClose={() => setShowSaveSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>保存拼贴方案</h3>
           <Input placeholder="输入方案名称" value={collageName} onChange={setCollageName} style={{ marginBottom: 16 }} />
@@ -1009,7 +1018,7 @@ export default function MobileCollageEditor() {
       </Popup>
 
       {/* 加载弹窗 */}
-      <Popup visible={showLoadSheet} onClose={() => setShowLoadSheet(false)} position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+      <Popup visible={showLoadSheet} onClose={() => setShowLoadSheet(false)} closeOnMaskClick position="bottom" bodyStyle={{ height: '50vh', overflow: 'auto', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
         <div style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px' }}>加载拼贴方案</h3>
           {collageList.length === 0 ? (

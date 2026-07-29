@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog } from 'antd-mobile';
-import { DeleteOutline, CheckCircleFill } from 'antd-mobile-icons';
+import { CheckCircleFill } from 'antd-mobile-icons';
 import {
   getCategories,
   getMaterials,
@@ -200,11 +200,11 @@ export default function MobileMaterialLibrary() {
         />
       </div>
 
-      <div style={{ background: '#fff', borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #f5f5f5', display: 'flex', alignItems: 'center', padding: '4px 8px' }}>
         <div style={{ flex: 1 }}>
           <Tabs
             activeKey={activeTab}
-            onChange={key => setActiveTab(key)}
+            onChange={key => { setActiveTab(key); setSelectMode(false); setSelectedIds(new Set()); }}
             style={{ '--title-font-size': '13px' }}
           >
             {tabItems.map(tab => (
@@ -213,18 +213,24 @@ export default function MobileMaterialLibrary() {
           </Tabs>
         </div>
         {activeTab !== 'backgrounds' && (
-          <Button
-            size="small"
-            fill={selectMode ? 'solid' : 'none'}
-            color={selectMode ? 'danger' : 'primary'}
-            onClick={() => {
-              setSelectMode(!selectMode);
-              setSelectedIds(new Set());
-            }}
-            style={{ marginRight: 8, flexShrink: 0 }}
-          >
-            {selectMode ? '取消' : '选择'}
-          </Button>
+          selectMode ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+              <Button size="small" color="danger" loading={deleting}
+                disabled={selectedIds.size === 0}
+                onClick={handleBatchDelete}>
+                删除{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              </Button>
+              <Button size="small" fill="none" onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}>
+                取消
+              </Button>
+            </div>
+          ) : (
+            <Button size="small" fill="none" color="primary"
+              onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}
+              style={{ flexShrink: 0, marginLeft: 8 }}>
+              选择
+            </Button>
+          )
         )}
       </div>
 
@@ -327,31 +333,6 @@ export default function MobileMaterialLibrary() {
           </>
         )}
       </div>
-
-      {/* 多选底部操作栏 */}
-      {selectMode && (
-        <div style={{
-          padding: '8px 16px',
-          paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0))',
-          background: '#fff',
-          borderTop: '1px solid #f0f0f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          {selectedIds.size > 0 ? (
-            <>
-              <span style={{ fontSize: 14, color: '#333' }}>已选 {selectedIds.size} 个</span>
-              <Button color="danger" size="small" loading={deleting} onClick={handleBatchDelete}>
-                <DeleteOutline /> 删除
-              </Button>
-            </>
-          ) : (
-            <span style={{ fontSize: 14, color: '#999' }}>请点击素材进行勾选</span>
-          )}
-        </div>
-      )}
 
       <ImageViewer.Multi
         key={previewKeyRef.current}
