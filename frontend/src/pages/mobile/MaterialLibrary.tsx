@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { SearchBar, Tabs, SpinLoading, ImageViewer, ErrorBlock, InfiniteScroll, Toast, Button, Dialog } from 'antd-mobile';
-import { DeleteOutline, CheckCircleFill, CircleOutline } from 'antd-mobile-icons';
+import { DeleteOutline, CheckCircleFill } from 'antd-mobile-icons';
 import {
   getCategories,
   getMaterials,
@@ -297,9 +297,7 @@ export default function MobileMaterialLibrary() {
                         }}>
                           {isSelected ? (
                             <CheckCircleFill style={{ color: '#fff', fontSize: 22 }} />
-                          ) : (
-                            <CircleOutline style={{ color: '#ccc', fontSize: 22 }} />
-                          )}
+                          ) : null}
                         </div>
                       )}
                       <div
