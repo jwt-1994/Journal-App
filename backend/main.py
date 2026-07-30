@@ -1,3 +1,20 @@
+# 必须在导入其他模块之前禁用 SSL 验证，解决 Windows 证书问题
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# 同时 patch requests 库（urllib3），因为 rembg 的 pooch 使用 requests 下载模型
+import requests
+from requests.adapters import HTTPAdapter
+_original_send = HTTPAdapter.send
+def _patched_send(self, request, **kwargs):
+    kwargs["verify"] = False
+    return _original_send(self, request, **kwargs)
+HTTPAdapter.send = _patched_send
+
+# 禁用 SSL 警告
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response

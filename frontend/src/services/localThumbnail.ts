@@ -38,7 +38,7 @@ export async function resizeImage(
       canvas.height = Math.round(img.height * ratio);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.75));
+      resolve(canvas.toDataURL('image/png'));
     };
     img.onerror = reject;
     img.src = dataUrl;
